@@ -1,5 +1,5 @@
 import requests
-from ml.utils.config import WEB_API_KEY, CONFIG
+from config import WEB_API_KEY, CONFIG
 import json
 # enables to call internal services externally
 #will be moved to external module, 
