@@ -1,13 +1,16 @@
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
-from v2realbot.enums.enums import PredOutput, Source, TargetTRFM
-from v2realbot.config import DATA_DIR
+from .utils.enums import PredOutput, Source, TargetTRFM
+from .utils.config import DATA_DIR
 from joblib import dump
-import v2realbot.ml.mlutils as mu
-from v2realbot.utils.utils import slice_dict_lists
+from .utils import mlutils as mu
+#import utils.mlutils as mu
+#from .utils import slice_dict_lists
 import numpy as np
 from copy import deepcopy
-import v2realbot.controller.services as cs
+#import v2realbot.controller.services as cs
+from .utils import ext_services as exts
+import requests
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
 
@@ -35,21 +38,21 @@ sample_indicators = {
 #pozor samotna data trida neobsahuje, jen konfiguraci a pak samotny model
 class ModelML:
     def __init__(self, name: str,
-                pred_output: PredOutput,
                 bar_features: list,
                 ind_features: list,
                 input_sequences: int,
                 target: str,
                 target_reference: str,
-                train_target_steps: int, #train
-                train_target_transformation: TargetTRFM, #train
                 train_epochs: int, #train
+                train_target_steps: int = 0, #train
+                train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train
                 train_runner_ids: list = None, #train
                 train_batch_id: str = None, #train
                 version: str = "1",
                 note : str = None,
                 use_bars: bool = True,
                 train_remove_cross_sequences: bool = False, #train
+                pred_output: PredOutput = PredOutput.LINEAR,
                 #standardne StandardScaler
                 scalerX: StandardScaler  = StandardScaler(),
                 scalerY: StandardScaler = StandardScaler(),
@@ -88,6 +91,10 @@ class ModelML:
         filename = mu.get_full_filename(self.name,self.version)
         dump(self, filename)
         print(f"model {self.name} save")
+
+    def upload(self):
+        filename = mu.get_full_filename(self.name,self.version)
+        return exts.upload_file(filename)
 
     #create X data with features
     def column_stack_source(self, bars, indicators, verbose = 1) -> np.array:
@@ -139,10 +146,16 @@ class ModelML:
             print("loading runners for ",str(runner_id_list))
         elif batch_id is not None:
             print("Loading runners for train_batch_id:", batch_id)
-            res, runner_ids = cs.get_archived_runnerslist_byBatchID(batch_id)
+            res, runner_ids = exts.get_archived_runners_list_by_batch_id(batch_id)
+            if res < 0:
+                print("error", runner_ids)
+                return None, None
         elif self.train_batch_id is not None:
             print("Loading runners for TRAINING BATCH self.train_batch_id:", self.train_batch_id)
-            res, runner_ids = cs.get_archived_runnerslist_byBatchID(self.train_batch_id)
+            res, runner_ids = exts.get_archived_runners_list_by_batch_id(self.train_batch_id)
+            if res < 0:
+                print("error", runner_ids)
+                return None, None
         #pripadne bereme z listu runneru
         else:
             runner_ids = self.train_runner_ids
@@ -364,8 +377,8 @@ class ModelML:
     #vystupem je jedna hodnota
     def predict(self, bars, indicators) -> float:
         #oriznuti podle seqence - pokud je nastaveno v modelu 
-        lastNbars = slice_dict_lists(bars, self.input_sequences)
-        lastNindicators =  slice_dict_lists(indicators, self.input_sequences)
+        lastNbars = mu.slice_dict_lists(bars, self.input_sequences)
+        lastNindicators =  mu.slice_dict_lists(indicators, self.input_sequences)
         # print("last5bars", lastNbars)
         # print("last5indicators",lastNindicators)
 

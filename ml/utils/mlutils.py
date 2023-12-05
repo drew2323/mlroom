@@ -1,15 +1,38 @@
 import numpy as np
-import v2realbot.controller.services as cs
+#import v2realbot.controller.services as cs
+import ml.utils.ext_services as es
 from joblib import load
-from v2realbot.config import DATA_DIR
+from ml.utils.config import MODEL_DIR
+from datetime import datetime
 
 def get_full_filename(name, version = "1"):
-  return DATA_DIR+'/models/'+name+'_v'+version+'.pkl'
+  file = name+'_v'+str(version)+'.pkl'
+  return MODEL_DIR / file
 
 def load_model(name, version = "1"):
    filename = get_full_filename(name, version)
    return load(filename)
-   
+
+def slice_dict_lists(d, last_item, to_tmstp = False):
+  """Slices every list in the dictionary to the last last_item items.
+  
+  Args:
+    d: A dictionary.
+    last_item: The number of items to keep at the end of each list.
+    to_tmstp: For "time" elements change it to timestamp from datetime if required.
+
+  Returns:
+    A new dictionary with the sliced lists.
+  """
+  sliced_d = {}
+  for key in d.keys():
+    if key == "time" and to_tmstp:
+        sliced_d[key] = [datetime.timestamp(t) for t in d[key][-last_item:]]
+    else:
+        sliced_d[key] = d[key][-last_item:]
+  return sliced_d
+
+
 #pomocne funkce na manipulaci s daty
 
 def merge_dicts(dict_list):
@@ -43,13 +66,14 @@ def merge_dicts(dict_list):
     # return merged_dict
 
 def load_runner(runner_id):
-    res, sada = cs.get_archived_runner_details_byID(runner_id)
+    res, sada = es.get_archived_runner_detail_by_id(runner_id)
     if res == 0:
         print("ok")
     else:
         print("error",res,sada)
-        raise Exception(f"error loading runner {runner_id} : {res} {sada}")
+        raise Exception(f"ERROR loading runner {runner_id} : {res} {sada}")
 
+    #print(sada)
     bars = sada["bars"]
     indicators = sada["indicators"][0]
     return bars, indicators

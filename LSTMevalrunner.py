@@ -2,12 +2,12 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-import v2realbot.ml.mlutils as mu
+import ml.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 import matplotlib.pyplot as plt
-from v2realbot.ml.ml import ModelML
-from v2realbot.enums.enums import PredOutput, Source, TargetTRFM
-from v2realbot.controller.services import get_archived_runner_details_byID, update_archive_detail
+from ml.ml import ModelML
+from ml.utils.enums import PredOutput, Source, TargetTRFM
+#from mlroom.controller.services import get_archived_runner_details_byID, update_archive_detail
 # from collections import defaultdict
 # from operator import itemgetter
 from joblib import load

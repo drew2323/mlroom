@@ -2,17 +2,20 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-import v2realbot.ml.mlutils as mu
+import ml.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 import matplotlib
 matplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
-from v2realbot.ml.ml import ModelML
-from v2realbot.enums.enums import PredOutput, Source, TargetTRFM
-import v2realbot.ml.modelsarch.architectures as ma
+from ml.ml import ModelML
+from ml.utils.enums import PredOutput, Source, TargetTRFM
+import ml.modelsarch.architectures as ma
+from ml.utils.config import CONFIG
 # from collections import defaultdict
 # from operator import itemgetter
 from joblib import load
+import argparse
+import toml
 
 # region Notes
 
@@ -130,167 +133,192 @@ from joblib import load
 
 # endregion
 
-#if null,the validation is made on 10% of train data
-#runnery pro testovani
-validation_runners = ["5297fba1-0274-49bf-adc7-9c0395754550"]
+def main():
+    train()
 
-#u binary bude target bud hotovy indikator a nebo jej vytvorit on the fly
-#mozna sem dal pluginovy eval load model architektury 
-cfg = ModelML(name="model1",
-              version = "0.1",
-              note = None,
-              pred_output=PredOutput.LINEAR,
-              input_sequences = 50,
-              use_bars = True,
-              bar_features = ["volume","trades", "close","high","open","low", "vwap","index"],
-              ind_features = ["slope", "ema50", 'firstbar_open','last_close','last_open'],
-              target='target', 
-              target_reference='vwap', #referencni hodnota pro target - napr pro graf
-              train_target_steps=3,
-              train_target_transformation=TargetTRFM.KEEPVAL,
-              train_runner_ids = None, #["5be77e0c-2d06-4968-9b83-00a6de038cdc"],
-              train_batch_id = "34e754c3",
-              train_epochs = 50,
-              train_remove_cross_sequences = True,
-              )
+def train():
+    #if null,the validation is made on 10% of train data
+    #runnery pro testovani
+    validation_runners = CONFIG["validation"]["runners"]
 
-#TODO toto cele dat do TRAIN metody - vcetne pripadneho loopu a podpory API
+    #u binary bude target bud hotovy indikator a nebo jej vytvorit on the fly
+    #mozna sem dal pluginovy eval load model architektury 
 
-test_size = None
+    model_instance = ModelML(**CONFIG["model"])
 
-#kdyz neplnime vstup, automaticky se loaduje training data z nastaveni classy
-source_data, target_data, rows_in_day = cfg.load_data()
+    # model_instance = ModelML(name="model1",
+    #             version = "0.1",
+    #             note = None,
+    #             pred_output=PredOutput.LINEAR,
+    #             input_sequences = 50,
+    #             use_bars = True,
+    #             bar_features = ["volume","trades", "close","high","open","low", "vwap","index"],
+    #             ind_features = ["slope", "ema50", 'firstbar_open','last_close','last_open'],
+    #             target='target', 
+    #             target_reference='vwap', #referencni hodnota pro target - napr pro graf
+    #             train_target_steps=3, #jen pro transformace, zatim nepouztito
+    #             train_target_transformation=TargetTRFM.KEEPVAL, #jen pro transformace
+    #             train_runner_ids = None, #["5be77e0c-2d06-4968-9b83-00a6de038cdc"],
+    #             train_batch_id = BATCH_ID,
+    #             train_epochs = 50,
+    #             train_remove_cross_sequences = True,
+    #             )
 
-if len(target_data) == 0:
-    raise Exception("target is empty - required for TRAINING - check target column name")
+    #TODO toto cele dat do TRAIN metody - vcetne pripadneho loopu a podpory API
 
-np.set_printoptions(threshold=10,edgeitems=5)
-#print("source_data", source_data)
-#print("target_data", target_data)
-print("rows_in_day", rows_in_day)
-source_data = cfg.scalerX.fit_transform(source_data)
+    #kdyz neplnime vstup, automaticky se loaduje training data z nastaveni classy
+    source_data, target_data, rows_in_day = model_instance.load_data()
 
-#TODO mozna vyhodit to UNTR
-#TODO asi vyhodit i target reference a vymyslet jinak
+    if len(target_data) == 0:
+        raise Exception("target is empty - required for TRAINING - check target column name")
 
-#vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
-#doplneni transformace target data
-X_train, y_train, y_train_ref = cfg.create_sequences(combined_data=source_data,
-                                                     target_data=target_data,
-                                                     remove_cross_sequences=cfg.train_remove_cross_sequences,
-                                                     rows_in_day=rows_in_day)
+    np.set_printoptions(threshold=10,edgeitems=5)
+    #print("source_data", source_data)
+    #print("target_data", target_data)
+    print("rows_in_day", rows_in_day)
+    source_data = model_instance.scalerX.fit_transform(source_data)
 
-#zobrazime si transformovany target a jeho referncni sloupec
-#ZHOMOGENIZOVAT OSY
-plt.plot(y_train, label='Transf target')
-plt.plot(y_train_ref, label='Ref target')
-plt.plot()
-plt.legend()
-plt.savefig("res_target.png")
-#plt.show()
+    #TODO mozna vyhodit to UNTR
+    #TODO asi vyhodit i target reference a vymyslet jinak
 
-print("After sequencing")
-print("source:X_train", np.shape(X_train))
-print("target:y_train", np.shape(y_train))
-print("target:", y_train)
-y_train = y_train.reshape(-1, 1)
+    #vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
+    #doplneni transformace target data
+    X_train, y_train, y_train_ref = model_instance.create_sequences(combined_data=source_data,
+                                                        target_data=target_data,
+                                                        remove_cross_sequences=model_instance.train_remove_cross_sequences,
+                                                        rows_in_day=rows_in_day)
 
-X_complete = np.array(X_train.copy())
-Y_complete = np.array(y_train.copy())
-X_train = np.array(X_train)
-y_train = np.array(y_train)
+    #zobrazime si transformovany target a jeho referncni sloupec
+    #ZHOMOGENIZOVAT OSY
+    plt.plot(y_train, label='Transf target')
+    plt.plot(y_train_ref, label='Ref target')
+    plt.plot()
+    plt.legend()
+    plt.savefig("res_target.png")
+    #plt.show()
 
-#target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
-y_train = cfg.scalerY.fit_transform(y_train)
+    print("After sequencing")
+    print("source:X_train", np.shape(X_train))
+    print("target:y_train", np.shape(y_train))
+    print("target:", y_train)
+    y_train = y_train.reshape(-1, 1)
 
+    X_complete = np.array(X_train.copy())
+    Y_complete = np.array(y_train.copy())
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
 
-if len(validation_runners) == 0:
-    test_size = 0.10
-# Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
-#nechame si takhle rozdelit i referencni sloupec
-X_train, X_test, y_train, y_test, y_train_ref, y_test_ref = train_test_split(X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
+    #target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
+    y_train = model_instance.scalerY.fit_transform(y_train)
 
-print("Splittig the data")
+    if "test_size" in CONFIG["validation"]:
+        test_size = CONFIG["validation"]["test_size"]
+    else:
+        test_size = 0
 
-print("X_train", np.shape(X_train))
-print("X_test", np.shape(X_test))
-print("y_train", np.shape(y_train))
-print("y_test", np.shape(y_test))
-print("y_test_ref", np.shape(y_test_ref))
-print("y_train_ref", np.shape(y_train_ref))
+    # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
+    #nechame si takhle rozdelit i referencni sloupec
+    X_train, X_test, y_train, y_test, y_train_ref, y_test_ref = train_test_split(X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
 
-#print(np.shape(X_train))
-# Define the input shape of the LSTM layer dynamically based on the reshaped X_train value
-input_shape = (X_train.shape[1], X_train.shape[2])
+    print("Splittig the data")
 
+    print("X_train", np.shape(X_train))
+    print("X_test", np.shape(X_test))
+    print("y_train", np.shape(y_train))
+    print("y_test", np.shape(y_test))
+    print("y_test_ref", np.shape(y_test_ref))
+    print("y_train_ref", np.shape(y_train_ref))
 
-#TODO udelat si vedle ruzne architektury modulu, ktere tady jenom naloaduji
-# 
-# model = Sequence()
-# model.add, model.compile
-
-# Build the LSTM model
-#cfg.model = Sequential()
-# cfg.model.add(LSTM(128, input_shape=input_shape))
-# cfg.model.add(Dense(1, activation="relu"))
-#activation: Gelu, relu, elu, sigmoid... 
-# Compile the model
-# cfg.model.compile(loss='mse', optimizer='adam')
-#loss: mse, binary_crossentropy
-
-#POKUD se OSVEDCI tak presunout do tridy (pripadne do model_compile a nebo compile, fit and save)
-cfg.model = ma.modelLSTM(input_shape)
-#cfg.model = ma.modelConv1DLR(input_shape, 0.0001)
+    #print(np.shape(X_train))
+    # Define the input shape of the LSTM layer dynamically based on the reshaped X_train value
+    input_shape = (X_train.shape[1], X_train.shape[2])
 
 
-# Train the model
-cfg.model.fit(X_train, y_train, epochs=cfg.train_epochs)
+    #TODO udelat si vedle ruzne architektury modulu, ktere tady jenom naloaduji
+    # 
+    # model = Sequence()
+    # model.add, model.compile
 
-#save the model
-cfg.save()
+    # Build the LSTM model
+    #model_instance.model = Sequential()
+    # model_instance.model.add(LSTM(128, input_shape=input_shape))
+    # model_instance.model.add(Dense(1, activation="relu"))
+    #activation: Gelu, relu, elu, sigmoid... 
+    # Compile the model
+    # model_instance.model.compile(loss='mse', optimizer='adam')
+    #loss: mse, binary_crossentropy
 
-#TBD db layer
-cfg: ModelML = mu.load_model(cfg.name, cfg.version)
+    #POKUD se OSVEDCI tak presunout do tridy (pripadne do model_compile a nebo compile, fit and save)
+    model_instance.model = ma.modelLSTM(input_shape)
+    #model_instance.model = ma.modelConv1DLR(input_shape, 0.0001)
 
-# region Live predict
-#EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
-barslist, indicatorslist = cfg.load_runners_as_list(runner_id_list=validation_runners)
-#zmergujeme vsechny data dohromady 
-bars = mu.merge_dicts(barslist)
-indicators = mu.merge_dicts(indicatorslist)
-cfg.validate_available_features(bars, indicators)
-#VSTUPEM JE standardni pole v strategii
-value = cfg.predict(bars, indicators)
-print("prediction for LIVE SIM:", value)
-# endregion
 
-#EVALUATE TEST DATA - VECTOR BASED
-#pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
-if len(validation_runners) > 0:
-    source_data, target_data, rows_in_day = cfg.load_data(runners_ids=validation_runners)
-    source_data = cfg.scalerX.fit_transform(source_data)
-    X_test, y_test, y_test_ref = cfg.create_sequences(combined_data=source_data, target_data=target_data,remove_cross_sequences=True, rows_in_day=rows_in_day)
+    # Train the model
+    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs)
 
-#prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
-#X_test = X_complete
-#y_test = Y_complete
+    #save the model
+    model_instance.save()
 
-X_test = cfg.model.predict(X_test)
-X_test = cfg.scalerY.inverse_transform(X_test)
+    if CONFIG["upload"]:
+        res, val = model_instance.upload()
+        if res < 0:
+            print("ERROR UPLOADING",res, val)
+            return 
+        else:
+            print("uploaded", res)
 
-#target testovacim dat proc tu je reshape?
-#y_test.reshape(-1, 1)
-y_test =  cfg.scalerY.inverse_transform(y_test.reshape(-1, 1))
-#celkovy mean? nebo spis vector pro graf?
-mse = mean_squared_error(y_test, X_test)
-print('Test MSE:', mse)
+    #VALIDATION PART
 
-# Plot the predicted vs. actual
-plt.plot(y_test, label='Actual')
-plt.plot(X_test, label='Predicted')
-#TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
-plt.plot(y_test_ref, label='reference column - price')
-plt.plot()
-plt.legend()
-plt.savefig("res_pred_act.png")
-#plt.show()
+    #TBD db layer
+    model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
+
+    # region Live predict
+    if len(validation_runners) > 0:
+        #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
+        barslist, indicatorslist = model_instance.load_runners_as_list(runner_id_list=validation_runners)
+        #zmergujeme vsechny data dohromady 
+        bars = mu.merge_dicts(barslist)
+        indicators = mu.merge_dicts(indicatorslist)
+        model_instance.validate_available_features(bars, indicators)
+        #VSTUPEM JE standardni pole v strategii
+        value = model_instance.predict(bars, indicators)
+        print("prediction for LIVE SIM:", value)
+        # endregion
+
+    #EVALUATE TEST DATA - VECTOR BASED
+    #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
+    validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
+    if len(validation_runners) > 0 or validation_batch is not None:
+        print(f"Loading validations {validation_runners=} {validation_batch=}")
+        source_data, target_data, rows_in_day = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
+        source_data = model_instance.scalerX.fit_transform(source_data)
+        X_test, y_test, y_test_ref = model_instance.create_sequences(combined_data=source_data, target_data=target_data,remove_cross_sequences=True, rows_in_day=rows_in_day)
+    else:
+        print("For validation part of testdata is used", test_size)
+    #prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
+    #X_test = X_complete
+    #y_test = Y_complete
+
+    X_test = model_instance.model.predict(X_test)
+    X_test = model_instance.scalerY.inverse_transform(X_test)
+
+    #target testovacim dat proc tu je reshape?
+    #y_test.reshape(-1, 1)
+    y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
+    #celkovy mean? nebo spis vector pro graf?
+    mse = mean_squared_error(y_test, X_test)
+    print('Test MSE:', mse)
+
+    # Plot the predicted vs. actual
+    plt.plot(y_test, label='Actual')
+    plt.plot(X_test, label='Predicted')
+    #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
+    plt.plot(y_test_ref, label='reference column - price')
+    plt.plot()
+    plt.legend()
+    plt.savefig("res_pred_act.png")
+    #plt.show()
+
+
+if __name__ == "__main__":
+    main()
