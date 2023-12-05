@@ -5,12 +5,12 @@ from joblib import load
 from ml.utils.config import MODEL_DIR
 from datetime import datetime
 
-def get_full_filename(name, version = "1"):
+def get_full_filename(name, version = "1", directory = MODEL_DIR):
   file = name+'_v'+str(version)+'.pkl'
-  return MODEL_DIR / file
+  return directory / file
 
-def load_model(name, version = "1"):
-   filename = get_full_filename(name, version)
+def load_model(name, version = "1", directory = MODEL_DIR):
+   filename = get_full_filename(name, version, directory)
    return load(filename)
 
 def slice_dict_lists(d, last_item, to_tmstp = False):
