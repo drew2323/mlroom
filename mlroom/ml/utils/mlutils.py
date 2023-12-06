@@ -1,8 +1,8 @@
 import numpy as np
 #import v2realbot.controller.services as cs
-import utils.ext_services as es
+import mlroom.ml.utils.ext_services as es
 from joblib import load
-from config import MODEL_DIR
+from mlroom.ml.config import MODEL_DIR
 from datetime import datetime
 
 def get_full_filename(name, version = "1", directory = MODEL_DIR):

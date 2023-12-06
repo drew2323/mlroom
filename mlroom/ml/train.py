@@ -2,20 +2,28 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-import utils.mlutils as mu
+import mlroom.ml.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 import matplotlib
 matplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
-from ml import ModelML
-from utils.enums import PredOutput, Source, TargetTRFM
-import modelsarch.architectures as ma
-from config import CONFIG
+from mlroom.ml.ml import ModelML
+from mlroom.ml.utils.enums import PredOutput, Source, TargetTRFM
+import mlroom.ml.modelsarch.architectures as ma
+from mlroom.ml.config import CONFIG
 # from collections import defaultdict
 # from operator import itemgetter
 from joblib import load
 import argparse
 import toml
+
+
+#TODO -skoncil jsem zde
+#1)kdyz package pipnu na v2realbot - zmizi config.toml a zacne fungovat 
+#notace ml.config, ml.utils - ale proc tady nefunguje? mela by! vymyslet
+#potom pokracovat viz veci v KEEPU
+
+
 
 # region Notes
 
