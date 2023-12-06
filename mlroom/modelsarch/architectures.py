@@ -10,7 +10,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM
 from keras.optimizers import Adam
 
-def modelLSTM(input_shape):
+def modelLSTM(input_shape, **params):
     # Define the model
     model = Sequential()
 
@@ -29,7 +29,10 @@ def modelLSTM(input_shape):
     return model
 
 
-def modelConv1D(input_shape):
+def modelConv1D(input_shape, **params):
+    learning_rate = 0.001
+    if "learning_rate" in params:
+        learning_rate = float(params["learning_rate"])
     model = Sequential()
     # Convolutional layers
     model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
@@ -44,27 +47,7 @@ def modelConv1D(input_shape):
     model.add(Dropout(0.5))
     # Output layer
     model.add(Dense(1, activation='tanh'))  # Single output neuron with tanh activation
-    model.compile(optimizer='adam', loss='mse', metrics=['mean_squared_error'])
-    return model
-
-def modelConv1DLR(input_shape, initial_learning_rate = 0.001):
-    # Create the model
-    model = Sequential()
-    # Convolutional layers
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
-    model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
-    model.add(MaxPooling1D(pool_size=2))
-    model.add(Flatten())
-    # Fully connected layers
-    model.add(Dense(100, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(50, activation='relu'))
-    model.add(Dropout(0.5))
-    # Output layer
-    model.add(Dense(1, activation='tanh'))  # Single output neuron with tanh activation
-
     # Compile the model with a custom learning rate
-    optimizer = Adam(learning_rate=initial_learning_rate)
+    optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
     return model

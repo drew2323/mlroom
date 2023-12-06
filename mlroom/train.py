@@ -17,14 +17,6 @@ from joblib import load
 import argparse
 import toml
 
-
-#TODO -skoncil jsem zde
-#1)kdyz package pipnu na v2realbot - zmizi config.toml a zacne fungovat 
-#notace ml.config, ml.utils - ale proc tady nefunguje? mela by! vymyslet
-#potom pokracovat viz veci v KEEPU
-
-
-
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -255,9 +247,13 @@ def train():
     # Compile the model
     # model_instance.model.compile(loss='mse', optimizer='adam')
     #loss: mse, binary_crossentropy
-
+    model_name = CONFIG["architecture"]["name"]
+    model_params = CONFIG["architecture"]["params"]
+    print("MODEL: ", model_name)
+    print("MODEL PARAMS:", model_params)
+    func_name = eval("ma."+model_name)
     #POKUD se OSVEDCI tak presunout do tridy (pripadne do model_compile a nebo compile, fit and save)
-    model_instance.model = ma.modelLSTM(input_shape)
+    model_instance.model = func_name(input_shape, **model_params)
     #model_instance.model = ma.modelConv1DLR(input_shape, 0.0001)
 
 

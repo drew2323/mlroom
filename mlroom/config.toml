@@ -7,7 +7,7 @@
     runners = ["5297fba1-0274-49bf-adc7-9c0395754550"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [configuration.model]
-    name = "model2uploaded"
+    name = "model2uploaded1"
     version = 0.1
     note = "poznamka"
     input_sequences = 50
@@ -18,8 +18,10 @@
     target_reference='vwap'
     #train_runner_ids = None
     train_batch_id = "34e754c3"
-    train_epochs = 1
+    train_epochs = 10
     train_remove_cross_sequences = true
 [configuration.architecture]
-    #architecture = "CONV1D"  #name of architecture plugin
-    learning_rate = 0.001
+    name = "modelConv1D"  #name of architecture plugin
+    #modelLSTM #modelConv1D (with learning_rate param)
+[configuration.architecture.params]
+    learning_rate = 0.0001
