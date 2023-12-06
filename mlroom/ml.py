@@ -1,6 +1,6 @@
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
-from utils.enums import PredOutput, Source, TargetTRFM
+from mlroom.utils.enums import PredOutput, Source, TargetTRFM
 from mlroom.config import DATA_DIR
 from joblib import dump
 from mlroom.utils import mlutils as mu

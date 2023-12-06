@@ -1,10 +1,12 @@
 [configuration]
-    download_server = "0.0.0.0" #to download batches/runners
-    upload_server = "0.0.0.0" #where to upload model
+    #prod 142.132.188.109
+    #test 5.161.179.223
+    download_server = "5.161.179.223" #to download batches/runners
+    upload_server = "5.161.179.223" #where to upload model
     upload = true
 [configuration.validation]
     test_size = 0.10 #validujeme na casti testovacich dat
-    runners = ["5297fba1-0274-49bf-adc7-9c0395754550"] #nad seznamem runner
+    runners = ["40a70474-94f5-473f-bc4a-3a2c8877172a"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [configuration.model]
     name = "model2uploaded1"
@@ -17,7 +19,7 @@
     target='target'
     target_reference='vwap'
     #train_runner_ids = None
-    train_batch_id = "34e754c3"
+    train_batch_id = "13ae329c"
     train_epochs = 10
     train_remove_cross_sequences = true
 [configuration.architecture]
