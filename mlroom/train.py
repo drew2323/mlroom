@@ -2,15 +2,15 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-import mlroom.ml.utils.mlutils as mu
+import mlroom.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 import matplotlib
 matplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
-from mlroom.ml.ml import ModelML
-from mlroom.ml.utils.enums import PredOutput, Source, TargetTRFM
-import mlroom.ml.modelsarch.architectures as ma
-from mlroom.ml.config import CONFIG
+from mlroom.ml import ModelML
+from mlroom.utils.enums import PredOutput, Source, TargetTRFM
+import mlroom.modelsarch.architectures as ma
+from mlroom.config import CONFIG
 # from collections import defaultdict
 # from operator import itemgetter
 from joblib import load

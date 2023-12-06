@@ -1,15 +1,15 @@
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
 from utils.enums import PredOutput, Source, TargetTRFM
-from mlroom.ml.config import DATA_DIR
+from mlroom.config import DATA_DIR
 from joblib import dump
-from mlroom.ml.utils import mlutils as mu
+from mlroom.utils import mlutils as mu
 #import utils.mlutils as mu
 #from .utils import slice_dict_lists
 import numpy as np
 from copy import deepcopy
 #import v2realbot.controller.services as cs
-from mlroom.ml.utils import ext_services as exts
+from mlroom.utils import ext_services as exts
 import requests
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
