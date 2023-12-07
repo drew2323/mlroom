@@ -56,7 +56,8 @@ class ModelML:
                 #standardne StandardScaler
                 scalerX: StandardScaler  = StandardScaler(),
                 scalerY: StandardScaler = StandardScaler(),
-                model: Sequential = Sequential()
+                model: Sequential = Sequential(),
+                conf: dict = None #whole configuration
                 )-> None:
         
         self.name = name
@@ -335,6 +336,9 @@ class ModelML:
             pocet = len(indicatorslist[i][self.ind_features[0]])
             print("pro runner vkladame pocet", pocet)
             rows_in_day.append(pocet)
+
+        barslist = None
+        indicatorslist = None
 
         rows_in_day = np.array(rows_in_day)
         rows_in_day = np.cumsum(rows_in_day)

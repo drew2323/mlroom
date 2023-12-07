@@ -35,9 +35,9 @@ def modelConv1D(input_shape, **params):
         learning_rate = float(params["learning_rate"])
     model = Sequential()
     # Convolutional layers
-    model.add(Conv1D(filters=64, kernel_size=5, activation='relu', input_shape=input_shape))
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=128, kernel_size=5, activation='relu'))
+    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
     model.add(Flatten())
     # Fully connected layers

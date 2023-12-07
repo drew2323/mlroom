@@ -4,6 +4,8 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 import mlroom.utils.mlutils as mu
 from keras.layers import LSTM, Dense
+from keras.callbacks import EarlyStopping
+
 import matplotlib
 #atplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
@@ -144,7 +146,7 @@ def train():
     #u binary bude target bud hotovy indikator a nebo jej vytvorit on the fly
     #mozna sem dal pluginovy eval load model architektury 
 
-    model_instance = ModelML(**CONFIG["model"])
+    model_instance = ModelML(**CONFIG["model"], conf=CONFIG)
 
     # model_instance = ModelML(name="model1",
     #             version = "0.1",
@@ -188,6 +190,9 @@ def train():
                                                         remove_cross_sequences=model_instance.train_remove_cross_sequences,
                                                         rows_in_day=rows_in_day)
 
+    
+    source_data = None
+    target_data = None
     #zobrazime si transformovany target a jeho referncni sloupec
     #ZHOMOGENIZOVAT OSY
     plt.plot(y_train, label='Transf target')
@@ -203,8 +208,8 @@ def train():
     print("target:", y_train)
     y_train = y_train.reshape(-1, 1)
 
-    X_complete = np.array(X_train.copy())
-    Y_complete = np.array(y_train.copy())
+    #X_complete = np.array(X_train.copy())
+    #Y_complete = np.array(y_train.copy())
     X_train = np.array(X_train)
     y_train = np.array(y_train)
 
@@ -255,11 +260,13 @@ def train():
     func_name = eval("ma."+model_name)
     #POKUD se OSVEDCI tak presunout do tridy (pripadne do model_compile a nebo compile, fit and save)
     model_instance.model = func_name(input_shape, **model_params)
-    #model_instance.model = ma.modelConv1DLR(input_shape, 0.0001)
+    #model_instance.model = ma.modelConv1DLR(input_shape, 0.0001)    
 
+    #behem deseti iteraci musi vzrust
+    early_stopping = EarlyStopping(monitor='mean_squared_error', patience=10, min_delta=0.001, mode='min')
 
     # Train the model
-    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs, batch_size=batch_size)
+    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs, batch_size=batch_size, callbacks=[early_stopping])
 
     #save the model
     model_instance.save()

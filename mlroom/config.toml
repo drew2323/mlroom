@@ -1,27 +1,34 @@
 [configuration]
-    #prod 142.132.188.109
+    #download_server = "142.132.188.109"
+    #upload_server = "142.132.188.109"
+    #download_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
+
     #test 5.161.179.223
     download_server = "5.161.179.223" #to download batches/runners
     upload_server = "5.161.179.223" #where to upload model
     upload = true
+    batch_size = 64 #pridat do tridy
 [configuration.validation]
-    test_size = 0.10 #validujeme na casti testovacich dat
-    runners = ["40a70474-94f5-473f-bc4a-3a2c8877172a"] #nad seznamem runner
+    test_size = 0.0 #validujeme na casti testovacich dat
+    runners = ["e7b98cdd-83b5-4686-a9dc-c155dff1cabd"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [configuration.model]
-    name = "model2uploaded1"
+    name = "model20_localized"
     version = 0.1
     note = "poznamka"
-    input_sequences = 50
+    input_sequences = 230
     use_bars = true
     bar_features = ["volume","trades", "close","high","open","low", "vwap","index"]
     ind_features = ["slope", "ema50"] #, 'firstbar_open','last_close','last_open']
-    target='target'
+    target='target20'
     target_reference='vwap'
-    #train_runner_ids = None
-    train_batch_id = "13ae329c"
-    train_epochs = 10
+    train_runner_ids = ["e7b98cdd-83b5-4686-a9dc-c155dff1cabd"]
+    #train_batch_id = "bc497816"
+    train_epochs = 500
     train_remove_cross_sequences = true
+
+
 [configuration.architecture]
     name = "modelConv1D"  #name of architecture plugin
     #modelLSTM #modelConv1D (with learning_rate param)
