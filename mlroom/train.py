@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 import mlroom.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 import matplotlib
-matplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
+#atplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
 from mlroom.ml import ModelML
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM
@@ -211,10 +211,10 @@ def train():
     #target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
     y_train = model_instance.scalerY.fit_transform(y_train)
 
+    test_size = None
     if "test_size" in CONFIG["validation"]:
-        test_size = CONFIG["validation"]["test_size"]
-    else:
-        test_size = 0
+        if CONFIG["validation"]["test_size"] != 0:
+            test_size = float(CONFIG["validation"]["test_size"])
 
     # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
     #nechame si takhle rozdelit i referencni sloupec
@@ -249,6 +249,7 @@ def train():
     #loss: mse, binary_crossentropy
     model_name = CONFIG["architecture"]["name"]
     model_params = CONFIG["architecture"]["params"]
+    batch_size = CONFIG["batch_size"]
     print("MODEL: ", model_name)
     print("MODEL PARAMS:", model_params)
     func_name = eval("ma."+model_name)
@@ -258,7 +259,7 @@ def train():
 
 
     # Train the model
-    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs)
+    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs, batch_size=batch_size)
 
     #save the model
     model_instance.save()
