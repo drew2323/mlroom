@@ -1,4 +1,3 @@
-[configuration]
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
     download_server = "0.0.0.0"
@@ -8,11 +7,11 @@
     #upload_server = "5.161.179.223" #where to upload model
     #download_server = "5.161.179.223" #to download batches/runners
     upload = true
-[configuration.validation]
+[validation]
     test_size = 0.0 #validujeme na casti testovacich dat
     runners = ["31d9921a-e157-46b5-a4d8-2ca7cb141ebc"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
-[configuration.model]
+[model]
     name = "modelNew"
     version = 0.1
     note = "poznamka"
@@ -29,11 +28,11 @@
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
 
-[configuration.model.architecture]
+[model.architecture]
     name = "Conv1D_"  #modelLSTM_ #modelConv1D_  name of file/function with architecture
-[configuration.model.architecture.params]
+[model.architecture.params]
     learning_rate = 0.0001
-[configuration.model.architecture.params.early_stopping]
+[model.architecture.params.early_stopping]
     monitor='mean_squared_error'
     patience=10
     min_delta=0.001

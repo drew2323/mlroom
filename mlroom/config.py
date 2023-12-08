@@ -13,7 +13,8 @@ def load_config(filename):
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Path to the .cfg file
 cfg_file = os.path.join(script_dir, 'config.toml')
-CONFIG, CONFIG_STRING = load_config(cfg_file)["configuration"]
+CONFIG, CONFIG_STRING = load_config(cfg_file)
+
 MODEL_DIR = Path(__file__).parent.parent.parent.parent / "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 WEB_API_KEY="david"
