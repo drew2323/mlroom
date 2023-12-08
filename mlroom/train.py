@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from mlroom.ml import ModelML
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM
 import mlroom.arch.architectures as ma
-from mlroom.config import CONFIG
+from mlroom.config import CONFIG, CONFIG_STRING
 # from collections import defaultdict
 # from operator import itemgetter
 from joblib import load
@@ -147,7 +147,7 @@ def train():
     #mozna sem dal pluginovy eval load model architektury 
     #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
 
-    model_instance = ModelML(**CONFIG["model"], cfg=CONFIG)
+    model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
     source_data, target_data, rows_in_day = model_instance.load_data()
 
     if len(target_data) == 0:

@@ -65,7 +65,8 @@ class ModelML:
                 scalerX: StandardScaler  = StandardScaler(),
                 scalerY: StandardScaler = StandardScaler(),
                 # model: Sequential = Sequential(),
-                cfg: dict = None #whole self.cfguration
+                cfg: dict = None, #whole self.cfguration
+                cfg_toml: str = None #whole configuration in unparsed toml for later use
                 )-> None:
         
         self.name = name
@@ -74,7 +75,7 @@ class ModelML:
         self.cfg = cfg
         self.architecture = architecture
         #pro zpetne dohledani
-        self.metadata = dict(cfg=cfg)
+        self.metadata = dict(cfg=cfg, cfg_toml=cfg_toml)
         self.pred_output: PredOutput = pred_output
         self.model = Sequential()
         #model muze byt take bez barů, tzn. jen indikatory
