@@ -10,6 +10,12 @@ from keras.models import Sequential
 from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM
 from keras.optimizers import Adam
 
+
+#activation: Gelu, relu, elu, sigmoid... 
+# Compile the model compile(loss='mse', optimizer='adam')
+#loss: mse, binary_crossentropy
+
+#TODO jak ulozit architecturu a mit jit
 def modelLSTM(input_shape, **params):
     # Define the model
     model = Sequential()
@@ -49,5 +55,8 @@ def modelConv1D(input_shape, **params):
     model.add(Dense(1, activation='tanh'))  # Single output neuron with tanh activation
     # Compile the model with a custom learning rate
     optimizer = Adam(learning_rate=learning_rate)
+
+    #print(model.__dict__)
+
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
     return model

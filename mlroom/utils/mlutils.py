@@ -1,7 +1,7 @@
 import numpy as np
 #import v2realbot.controller.services as cs
 import mlroom.utils.ext_services as es
-from joblib import load
+import joblib
 from mlroom.config import MODEL_DIR
 from datetime import datetime
 
@@ -9,9 +9,12 @@ def get_full_filename(name, version = "1", directory = MODEL_DIR):
   file = name+'_v'+str(version)+'.pkl'
   return directory / file
 
-def load_model(name, version = "1", directory = MODEL_DIR):
-   filename = get_full_filename(name, version, directory)
-   return load(filename)
+def load_model(name = None, version = "1", file = None, directory = MODEL_DIR):
+  if file is None:
+     filename = get_full_filename(name, version, directory)
+  else:
+     filename = directory / file
+  return joblib.load(filename)
 
 def slice_dict_lists(d, last_item, to_tmstp = False):
   """Slices every list in the dictionary to the last last_item items.

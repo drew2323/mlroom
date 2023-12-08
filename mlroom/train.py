@@ -6,12 +6,12 @@ import mlroom.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 from keras.callbacks import EarlyStopping
 
-import matplotlib
+#import matplotlib
 #atplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
 from mlroom.ml import ModelML
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM
-import mlroom.modelsarch.architectures as ma
+import mlroom.arch.architectures as ma
 from mlroom.config import CONFIG
 # from collections import defaultdict
 # from operator import itemgetter
@@ -145,30 +145,9 @@ def train():
 
     #u binary bude target bud hotovy indikator a nebo jej vytvorit on the fly
     #mozna sem dal pluginovy eval load model architektury 
+    #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
 
-    model_instance = ModelML(**CONFIG["model"], conf=CONFIG)
-
-    # model_instance = ModelML(name="model1",
-    #             version = "0.1",
-    #             note = None,
-    #             pred_output=PredOutput.LINEAR,
-    #             input_sequences = 50,
-    #             use_bars = True,
-    #             bar_features = ["volume","trades", "close","high","open","low", "vwap","index"],
-    #             ind_features = ["slope", "ema50", 'firstbar_open','last_close','last_open'],
-    #             target='target', 
-    #             target_reference='vwap', #referencni hodnota pro target - napr pro graf
-    #             train_target_steps=3, #jen pro transformace, zatim nepouztito
-    #             train_target_transformation=TargetTRFM.KEEPVAL, #jen pro transformace
-    #             train_runner_ids = None, #["5be77e0c-2d06-4968-9b83-00a6de038cdc"],
-    #             train_batch_id = BATCH_ID,
-    #             train_epochs = 50,
-    #             train_remove_cross_sequences = True,
-    #             )
-
-    #TODO toto cele dat do TRAIN metody - vcetne pripadneho loopu a podpory API
-
-    #kdyz neplnime vstup, automaticky se loaduje training data z nastaveni classy
+    model_instance = ModelML(**CONFIG["model"], cfg=CONFIG)
     source_data, target_data, rows_in_day = model_instance.load_data()
 
     if len(target_data) == 0:
@@ -180,9 +159,6 @@ def train():
     print("rows_in_day", rows_in_day)
     source_data = model_instance.scalerX.fit_transform(source_data)
 
-    #TODO mozna vyhodit to UNTR
-    #TODO asi vyhodit i target reference a vymyslet jinak
-
     #vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
     #doplneni transformace target data
     X_train, y_train, y_train_ref = model_instance.create_sequences(combined_data=source_data,
@@ -193,14 +169,9 @@ def train():
     
     source_data = None
     target_data = None
-    #zobrazime si transformovany target a jeho referncni sloupec
-    #ZHOMOGENIZOVAT OSY
-    plt.plot(y_train, label='Transf target')
-    plt.plot(y_train_ref, label='Ref target')
-    plt.plot()
-    plt.legend()
-    plt.savefig("res_target.png")
-    #plt.show()
+
+    #zobrazit target if necessary
+    #model_instance.plot_target(y_train,y_train_ref)
 
     print("After sequencing")
     print("source:X_train", np.shape(X_train))
@@ -235,52 +206,13 @@ def train():
     print("y_train_ref", np.shape(y_train_ref))
 
     #print(np.shape(X_train))
-    # Define the input shape of the LSTM layer dynamically based on the reshaped X_train value
-    input_shape = (X_train.shape[1], X_train.shape[2])
+    #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
+    model_instance.train_and_store(X_train, y_train)
 
-
-    #TODO udelat si vedle ruzne architektury modulu, ktere tady jenom naloaduji
-    # 
-    # model = Sequence()
-    # model.add, model.compile
-
-    # Build the LSTM model
-    #model_instance.model = Sequential()
-    # model_instance.model.add(LSTM(128, input_shape=input_shape))
-    # model_instance.model.add(Dense(1, activation="relu"))
-    #activation: Gelu, relu, elu, sigmoid... 
-    # Compile the model
-    # model_instance.model.compile(loss='mse', optimizer='adam')
-    #loss: mse, binary_crossentropy
-    model_name = CONFIG["architecture"]["name"]
-    model_params = CONFIG["architecture"]["params"]
-    batch_size = CONFIG["batch_size"]
-    print("MODEL: ", model_name)
-    print("MODEL PARAMS:", model_params)
-    func_name = eval("ma."+model_name)
-    #POKUD se OSVEDCI tak presunout do tridy (pripadne do model_compile a nebo compile, fit and save)
-    model_instance.model = func_name(input_shape, **model_params)
-    #model_instance.model = ma.modelConv1DLR(input_shape, 0.0001)    
-
-    #behem deseti iteraci musi vzrust
-    early_stopping = EarlyStopping(monitor='mean_squared_error', patience=10, min_delta=0.001, mode='min')
-
-    # Train the model
-    model_instance.model.fit(X_train, y_train, epochs=model_instance.train_epochs, batch_size=batch_size, callbacks=[early_stopping])
-
-    #save the model
-    model_instance.save()
-
-    if CONFIG["upload"]:
-        res, val = model_instance.upload()
-        if res < 0:
-            print("ERROR UPLOADING",res, val)
-            return 
-        else:
-            print("uploaded", res)
-
+    print("TRAINGING FINISHED")
     #VALIDATION PART
 
+    print("STARTING VALIDATION")
     #TBD db layer
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
 

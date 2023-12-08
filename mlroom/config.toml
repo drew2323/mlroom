@@ -1,36 +1,40 @@
 [configuration]
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    #download_server = "0.0.0.0"
-    #upload_server = "0.0.0.0"
+    download_server = "0.0.0.0"
+    upload_server = "0.0.0.0"
 
     #test 5.161.179.223
-    download_server = "5.161.179.223" #to download batches/runners
-    upload_server = "5.161.179.223" #where to upload model
+    #upload_server = "5.161.179.223" #where to upload model
+    #download_server = "5.161.179.223" #to download batches/runners
     upload = true
-    batch_size = 64 #pridat do tridy
 [configuration.validation]
     test_size = 0.0 #validujeme na casti testovacich dat
-    runners = ["e7b98cdd-83b5-4686-a9dc-c155dff1cabd"] #nad seznamem runner
+    runners = ["31d9921a-e157-46b5-a4d8-2ca7cb141ebc"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [configuration.model]
-    name = "model20_localized"
+    name = "modelNew"
     version = 0.1
     note = "poznamka"
-    input_sequences = 230
+    input_sequences = 100
     use_bars = true
-    bar_features = ["volume","trades", "close","high","open","low", "vwap","index"]
-    ind_features = ["slope", "ema50"] #, 'firstbar_open','last_close','last_open']
-    target='target20'
+    bar_features = ["volume","trades", "close","high","open","low"]
+    ind_features = ["firstbaropen", "lastclose","lastopen"] #, 'firstbar_open','last_close','last_open']
+    target='target3'
     target_reference='vwap'
-    train_runner_ids = ["e7b98cdd-83b5-4686-a9dc-c155dff1cabd"]
-    #train_batch_id = "bc497816"
-    train_epochs = 500
+    train_runner_ids = ["31d9921a-e157-46b5-a4d8-2ca7cb141ebc"]
+    #train_batch_id = "93604701"
+    train_epochs = 100
     train_remove_cross_sequences = true
+    train_batch_size = 64
+    #sem pridat batch_id a take earlystoppage params
 
-
-[configuration.architecture]
-    name = "modelConv1D"  #name of architecture plugin
-    #modelLSTM #modelConv1D (with learning_rate param)
-[configuration.architecture.params]
+[configuration.model.architecture]
+    name = "Conv1D_"  #modelLSTM_ #modelConv1D_  name of file/function with architecture
+[configuration.model.architecture.params]
     learning_rate = 0.0001
+[configuration.model.architecture.params.early_stopping]
+    monitor='mean_squared_error'
+    patience=10
+    min_delta=0.001
+    mode='min'

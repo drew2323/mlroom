@@ -1,8 +1,9 @@
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM
 from mlroom.config import DATA_DIR
-from joblib import dump
+import joblib
 from mlroom.utils import mlutils as mu
 #import utils.mlutils as mu
 #from .utils import slice_dict_lists
@@ -10,7 +11,11 @@ import numpy as np
 from copy import deepcopy
 #import v2realbot.controller.services as cs
 from mlroom.utils import ext_services as exts
+import mlroom.arch as arch
 import requests
+from keras.callbacks import EarlyStopping
+import inspect
+
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
 
@@ -48,22 +53,30 @@ class ModelML:
                 train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train
                 train_runner_ids: list = None, #train
                 train_batch_id: str = None, #train
+                train_batch_size: int = 32,
                 version: str = "1",
                 note : str = None,
                 use_bars: bool = True,
                 train_remove_cross_sequences: bool = False, #train
                 pred_output: PredOutput = PredOutput.LINEAR,
+                #architecture settings from TOML file
+                architecture: dict = None,
                 #standardne StandardScaler
                 scalerX: StandardScaler  = StandardScaler(),
                 scalerY: StandardScaler = StandardScaler(),
-                model: Sequential = Sequential(),
-                conf: dict = None #whole configuration
+                # model: Sequential = Sequential(),
+                cfg: dict = None #whole self.cfguration
                 )-> None:
         
         self.name = name
         self.version = version
         self.note  = note
+        self.cfg = cfg
+        self.architecture = architecture
+        #pro zpetne dohledani
+        self.metadata = dict(cfg=cfg)
         self.pred_output: PredOutput = pred_output
+        self.model = Sequential()
         #model muze byt take bez barů, tzn. jen indikatory
         self.use_bars = use_bars
         #zajistime poradi
@@ -75,6 +88,7 @@ class ModelML:
             raise Exception("train_runner_ids nebo train_batch_id musi byt vyplnene")
         self.train_runner_ids = train_runner_ids
         self.train_batch_id = train_batch_id
+        self.train_batch_size = train_batch_size
         #target cílový sloupec, který je používám přímo nebo transformován na binary
         self.target = target
         self.target_reference = target_reference
@@ -86,11 +100,65 @@ class ModelML:
         self.train_remove_cross_sequences = train_remove_cross_sequences
         self.scalerX = scalerX
         self.scalerY = scalerY
-        self.model = model
+
+    #inicializace modelu podle vlozeneho pluginu a pripadne dalsich
+    #TODO ulozeni obsahu architekt funkce skrz inspect (k dispozici)
+    def initialize_model(architecture: dict):
+        pass
+
+    def train(self, X_train, y_train):
+        # Define the input shape of the LSTM layer dynamically based on the reshaped X_train value
+        input_shape = (X_train.shape[1], X_train.shape[2])
+
+        #LOAD and INITIALIZE THE ARCHITECTURE
+        model_name = self.architecture["name"]
+        model_params = self.architecture.get("params", None)
+
+        #early_stopping = self.model_params.get("architecture", {}).get("params", {}).get("early_stopping", None)
+        early_stopping = model_params.get("early_stopping", None)
+
+        print("MODEL: ", model_name)
+        print("MODEL PARAMS:", model_params)
+
+        arch_function = eval("arch."+model_name+"."+model_name)
+        print("FUNCTION TO CALL",arch_function)
+
+        self.metadata["arch_function"] =  inspect.getsource(arch_function)
+        print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
+
+        # **model_params
+        self.model = arch_function(input_shape)
+        print("COMPILED MODEL LOADED")
+
+        #create input params if provided
+        fit_params = {'epochs': self.train_epochs}
+        if self.train_batch_size is not None:
+            fit_params['batch_size'] = self.train_batch_size
+        if early_stopping is not None:
+            #support for early stoppage
+            early_stopping = EarlyStopping(**early_stopping)
+            fit_params['callbacks'] = [early_stopping]
+
+        self.model.fit(X_train,y_train, **fit_params)
+
+    #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
+    def train_and_store(self, X_train, y_train):
+
+        self.train(X_train, y_train)
+        #save the model
+        self.save()
+
+        if self.cfg["upload"]:
+            res, val = self.upload()
+            if res < 0:
+                print("ERROR UPLOADING",res, val)
+                return 
+            else:
+                print("uploaded", res)
 
     def save(self):
         filename = mu.get_full_filename(self.name,self.version)
-        dump(self, filename)
+        joblib.dump(self, filename)
         print(f"model {self.name} save")
 
     def upload(self):
@@ -295,10 +363,11 @@ class ModelML:
     #pro vybrane runnery stahne data, vybere sloupce dle faature a target
     #a vrátí jako sloupce v numpy poli
     #zaroven vraci i rows_in_day pro nasledny sekvencing
+    #kdyz neplnime vstup, automaticky se loaduje training data z nastaveni classy
     def load_data(self, runners_ids: list = None, batch_id: list = None, source: Source = Source.RUNNERS):
         """Service to load data for the model. Can be used for training or for vector prediction.
 
-        If input data are not provided it falls back to the class init configuration (train_runners_ids, train_batch_id)
+        If input data are not provided it falls back to the class init self.cfguration (train_runners_ids, train_batch_id)
 
         Args:
             runner_ids: 
@@ -404,3 +473,12 @@ class ModelML:
         # Convert the prediction back to the original scale
         prediction = self.scalerY.inverse_transform(prediction)
         return float(prediction)
+
+    def plot_target(self, y_train,y_train_ref):   #zobrazime si transformovany target a jeho referncni sloupec
+        #ZHOMOGENIZOVAT OSY
+        plt.plot(y_train, label='Transf target')
+        plt.plot(y_train_ref, label='Ref target')
+        plt.plot()
+        plt.legend()
+        plt.savefig("res_target.png")
+        #plt.show()

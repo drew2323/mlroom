@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mlroom',
-    version='0.31',
+    version='0.32',
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -14,6 +14,7 @@ setup(
         'tensorflow==2.15',  # Specify minimum version requirement
         'scikit-learn==1.3.2',  # Specify minimum version requirement
         'appdirs',
-        'alpaca-py'
+        'alpaca-py',
+        'joblib==1.3.2'
     ],
 )
