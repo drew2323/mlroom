@@ -68,7 +68,7 @@ def merge_dicts(dict_list):
 
     # return merged_dict
 
-def load_runner(runner_id):
+def load_runner(runner_id, use_cbars = False):
     res, sada = es.get_archived_runner_detail_by_id(runner_id)
     if res == 0:
         print("ok")
@@ -78,5 +78,9 @@ def load_runner(runner_id):
 
     #print(sada)
     bars = sada["bars"]
-    indicators = sada["indicators"][0]
+    #vracime tick indicatory if required
+    if use_cbars:
+      indicators = sada["indicators"][1]
+    else:
+      indicators = sada["indicators"][0]
     return bars, indicators

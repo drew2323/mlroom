@@ -9,21 +9,22 @@
     upload = true
 [validation]
     test_size = 0.0 #validujeme na casti testovacich dat
-    runners = ["31d9921a-e157-46b5-a4d8-2ca7cb141ebc"] #nad seznamem runner
+    runners = ["ee6103c3-7ba7-49ca-8dc7-cd640a681616"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
-    name = "modelNew"
+    name = "modelCbar"
     version = 0.1
     note = "poznamka"
     input_sequences = 100
-    use_bars = true
-    bar_features = ["volume","trades", "close","high","open","low"]
-    ind_features = ["firstbaropen", "lastclose","lastopen"] #, 'firstbar_open','last_close','last_open']
+    use_bars = false
+    use_cbars = true #pokud je truem tak v ind_features jsou cbary a use_bars je false
+    bar_features = [] # ["volume","trades", "close","high","open","low"]
+    ind_features = ["tick_price", "tick_volume","tick_trades", "tick_tradecnt", "tick_count1", "slopetick5"] #, 'firstbar_open','last_close','last_open']
     target='target3'
-    target_reference='vwap'
-    train_runner_ids = ["31d9921a-e157-46b5-a4d8-2ca7cb141ebc"]
+    target_reference='tick_price'
+    train_runner_ids = ["ee6103c3-7ba7-49ca-8dc7-cd640a681616"]
     #train_batch_id = "93604701"
-    train_epochs = 100
+    train_epochs = 10
     train_remove_cross_sequences = true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
@@ -31,7 +32,7 @@
 [model.architecture]
     name = "Conv1D_"  #modelLSTM_ #modelConv1D_  name of file/function with architecture
 [model.architecture.params]
-    learning_rate = 0.0001
+    learning_rate = 0.001
 [model.architecture.params.early_stopping]
     monitor='mean_squared_error'
     patience=10

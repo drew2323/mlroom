@@ -41,6 +41,9 @@ sample_indicators = {
 #Trida, která drzi instanci ML modelu a jeho konfigurace
 #take se pouziva jako nastroj na pripravu dat pro train a predikci
 #pozor samotna data trida neobsahuje, jen konfiguraci a pak samotny model
+"""
+Zatim bud bud 1) bar nebo stanndardni indicator 2) cbar indikatory  , zatim nepodporovano spolecne protoze nemaji stejny time
+"""
 class ModelML:
     def __init__(self, name: str,
                 bar_features: list,
@@ -57,6 +60,8 @@ class ModelML:
                 version: str = "1",
                 note : str = None,
                 use_bars: bool = True,
+                #timto nastavujeme, ze indikatory jsou cbary - tim, ze nelze zatim spolecne muzeme prepouzit logiku
+                use_cbars: bool = False,
                 train_remove_cross_sequences: bool = False, #train
                 pred_output: PredOutput = PredOutput.LINEAR,
                 #architecture settings from TOML file
@@ -85,6 +90,7 @@ class ModelML:
         ind_features.sort()
         self.bar_features = bar_features
         self.ind_features = ind_features
+        self.use_cbars = use_cbars
         if (train_runner_ids is None or len(train_runner_ids) == 0) and train_batch_id is None:
             raise Exception("train_runner_ids nebo train_batch_id musi byt vyplnene")
         self.train_runner_ids = train_runner_ids
@@ -236,7 +242,7 @@ class ModelML:
         indicatorslist = []
         ind_keys = None
         for runner_id in runner_ids:
-            bars, indicators = mu.load_runner(runner_id)
+            bars, indicators = mu.load_runner(runner_id, self.use_cbars)
             print(f"runner:{runner_id}")
             if self.use_bars:
                 barslist.append(bars)
@@ -418,7 +424,7 @@ class ModelML:
         print(f"number of indicators {len(indicators)}")
         print(f"number of bar elements{len(bars)}")
         print(f"ind list length {len(indicators['time'])}")
-        print(f"bar list length {len(bars['time'])}")
+        print(f"bar list length {len(bars['time']) if len(bars) > 0 else None}")
 
         self.validate_available_features(bars, indicators)    
 
