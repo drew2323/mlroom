@@ -13,8 +13,8 @@
     batch = "" #nad konkretnim batchem
 [model]
     name = "modelCbar"
-    version = 0.8
-    note = "data: 15.-24.11. target 30sec, complex model"
+    version = 0.92
+    note = "data: 15.-24.11. target 30sec, complex model, Attention"
     input_sequences = 75
     use_bars = false
     use_cbars = true #pokud je truem tak v ind_features jsou cbary a use_bars je false
@@ -24,13 +24,13 @@
     target_reference='tick_price'
     train_runner_ids = [] #["70a887ff-c89a-4bbb-9a5b-bb03dece6812"]
     train_batch_id = "1ca02a05"
-    train_epochs = 100
+    train_epochs = 70
     train_remove_cross_sequences = true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
 
 [model.architecture]
-    name = "Conv1Dcomplex_"  #modelLSTM_ #Conv1D_ "TCN_" name of file/function with architecture
+    name = "Conv1DcomplexAtt_"  #modelLSTM_ #Conv1D_ "TCN_" name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]
