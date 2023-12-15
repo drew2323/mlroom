@@ -149,6 +149,8 @@ class ModelML:
         res_object=self.model.fit(X_train,y_train, **fit_params)
         self.metadata["history"] = res_object.history
 
+        mu.send_to_telegram("TRAINING FINISHED")
+
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
     def train_and_store(self, X_train, y_train):
 
@@ -160,7 +162,7 @@ class ModelML:
             res, val = self.upload()
             if res < 0:
                 print("ERROR UPLOADING",res, val)
-                return 
+                return
             else:
                 print("uploaded", res)
 

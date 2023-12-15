@@ -4,6 +4,20 @@ import mlroom.utils.ext_services as es
 import joblib
 from mlroom.config import MODEL_DIR
 from datetime import datetime
+import socket
+import requests
+
+def send_to_telegram(message):
+    apiToken = '5836666362:AAGPuzwp03tczMQTwTBiHW6VsZZ-1RCMAEE'
+    chatID = '5029424778'
+    apiURL = f'https://api.telegram.org/bot{apiToken}/sendMessage'
+
+    message = socket.gethostname() + " " + message
+    try:
+        response = requests.post(apiURL, json={'chat_id': chatID, 'text': message})
+        print(response.text)
+    except Exception as e:
+        print(e)
 
 def get_full_filename(name, version = "1", directory = MODEL_DIR):
   file = name+'_v'+str(version)+'.pkl'
