@@ -146,7 +146,8 @@ class ModelML:
             early_stopping = EarlyStopping(**early_stopping)
             fit_params['callbacks'] = [early_stopping]
 
-        self.model.fit(X_train,y_train, **fit_params)
+        res_object=self.model.fit(X_train,y_train, **fit_params)
+        self.metadata["history"] = res_object.history
 
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
     def train_and_store(self, X_train, y_train):

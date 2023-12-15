@@ -1,40 +1,40 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    download_server = "0.0.0.0"
-    upload_server = "0.0.0.0"
+    #download_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
 
     #test 5.161.179.223
-    #upload_server = "5.161.179.223" #where to upload model
-    #download_server = "5.161.179.223" #to download batches/runners
+    upload_server = "5.161.179.223" #where to upload model
+    download_server = "5.161.179.223" #to download batches/runners
     upload = true
 [validation]
     test_size = 0.0 #validujeme na casti testovacich dat
-    runners = ["ee6103c3-7ba7-49ca-8dc7-cd640a681616"] #nad seznamem runner
+    runners = ["be668ca2-ac9f-485d-981e-feb488e5ae1c"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
     name = "modelCbar"
-    version = 0.1
-    note = "poznamka"
-    input_sequences = 100
+    version = 0.6
+    note = "data: 15.-24.11. target 30sec"
+    input_sequences = 75
     use_bars = false
     use_cbars = true #pokud je truem tak v ind_features jsou cbary a use_bars je false
     bar_features = [] # ["volume","trades", "close","high","open","low"]
-    ind_features = ["tick_price", "tick_volume","tick_trades", "tick_tradecnt", "tick_count1", "slopetick5"] #, 'firstbar_open','last_close','last_open']
+    ind_features = ["tick_price", "tick_volume","tick_trades", "barbased_OIO_tick", "tick_count1"] #, 'firstbar_open','last_close','last_open']
     target='target3'
     target_reference='tick_price'
-    train_runner_ids = ["ee6103c3-7ba7-49ca-8dc7-cd640a681616"]
-    #train_batch_id = "93604701"
-    train_epochs = 10
+    train_runner_ids = [] #["70a887ff-c89a-4bbb-9a5b-bb03dece6812"]
+    train_batch_id = "1ca02a05"
+    train_epochs = 500
     train_remove_cross_sequences = true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
 
 [model.architecture]
-    name = "Conv1D_"  #modelLSTM_ #modelConv1D_  name of file/function with architecture
+    name = "Conv1D_"  #modelLSTM_ #Conv1D_ "TCN_" name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]
     monitor='mean_squared_error'
     patience=10
-    min_delta=0.001
+    min_delta=0.0001
     mode='min'
