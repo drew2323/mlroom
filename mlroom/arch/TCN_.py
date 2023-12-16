@@ -23,8 +23,8 @@ def TCN_(input_shape, **params):
     # Building the TCN model
     model.add(
         TCN(input_shape=input_shape, 
-            nb_filters=64, 
-            kernel_size=3, #If sequence heavily depends on t-1 and t-2, but less on the rest, then choose a kernel size of 2/3.
+            nb_filters=128, 
+            kernel_size=5, #If sequence heavily depends on t-1 and t-2, but less on the rest, then choose a kernel size of 2/3.
             dilations=[1, 2, 4, 8], 
             padding='causal', 
             use_skip_connections=True))

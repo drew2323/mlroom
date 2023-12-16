@@ -1,10 +1,10 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
     #download_server = "0.0.0.0"
-    upload_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
 
     #test 5.161.179.223
-    #upload_server = "5.161.179.223" #where to upload model
+    upload_server = "5.161.179.223" #where to upload model
     download_server = "5.161.179.223" #to download batches/runners
     upload = true
 [validation]
@@ -13,7 +13,7 @@
     batch = "" #nad konkretnim batchem
 [model]
     name = "modelCbar"
-    version = 0.97
+    version = 0.98
     note = "data: 15.-24.11. target 30sec, complex model, Attention, test custom layer save/load"
     input_sequences = 75
     use_bars = false
@@ -22,19 +22,19 @@
     ind_features = ["tick_price", "tick_volume","tick_trades", "barbased_OIO_tick", "tick_count1"] #, 'firstbar_open','last_close','last_open']
     target='target3'
     target_reference='tick_price'
-    train_runner_ids = ["be668ca2-ac9f-485d-981e-feb488e5ae1c"]
-    #train_batch_id = "1ca02a05"
+    train_runner_ids = [] #["be668ca2-ac9f-485d-981e-feb488e5ae1c"]
+    train_batch_id = "1ca02a05"
     train_epochs = 1
     train_remove_cross_sequences = true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
 
 [model.architecture]
-    name = "Conv1DcomplexAtt_"  #modelLSTM_ #Conv1D_ "TCN_" name of file/function with architecture
+    name = "TCN_"  #modelLSTM_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]
     monitor='mean_squared_error'
-    patience=10
+    patience=20
     min_delta=0.0001
     mode='min'
