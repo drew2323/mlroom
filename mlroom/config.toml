@@ -26,11 +26,11 @@
     train_batch_id = "1ca02a05"
     train_epochs = 1
     train_remove_cross_sequences = true
-    train_batch_size = 64
+    train_batch_size = 32
     #sem pridat batch_id a take earlystoppage params
 
 [model.architecture]
-    name = "TCN_"  #modelLSTM_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
+    name = "LSTM_"  #modelLSTM_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]

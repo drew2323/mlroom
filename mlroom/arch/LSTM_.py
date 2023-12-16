@@ -10,6 +10,10 @@ from keras.models import Sequential
 from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM
 from keras.optimizers import Adam
 #TODO jak ulozit architecturu a mit jit
+import tensorflow as tf
+gpu_devices = tf.config.experimental.list_physical_devices("GPU")
+for device in gpu_devices:
+    tf.config.experimental.set_memory_growth(device, True)
 
 def LSTM_(input_shape, **params):
     # Define the model
@@ -27,4 +31,4 @@ def LSTM_(input_shape, **params):
     # Compile the model
     model.compile(optimizer='adam', loss='mean_squared_error')   
 
-    return model
+    return model, {}
