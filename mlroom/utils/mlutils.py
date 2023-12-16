@@ -36,7 +36,7 @@ def load_model_legacy(name = None, version = "1", file = None, directory = MODEL
 
 
 #CUSTOM LAYER SUPPORTED SAVE and LOAD- https://chat.openai.com/c/d53c23d0-5029-427d-887f-6de2675c1b1f
-def load_model(name = None, version = "1", file = None, directory = MODEL_DIR):
+def load_model(name = None, version = "1", file = None, directory = MODEL_DIR, cfg_only = False):
   if file is None:
      filename = get_full_filename(name, version, directory)
   else:
@@ -45,11 +45,13 @@ def load_model(name = None, version = "1", file = None, directory = MODEL_DIR):
   # Load the entire instance with joblib
   loaded_instance = joblib.load(filename)
 
-  # Deserialize the Keras model
-  model_json = loaded_instance.model['model_json']
-  model_weights = loaded_instance.model['model_weights']
-  loaded_instance.model = model_from_json(model_json, custom_objects=loaded_instance.custom_layers)
-  loaded_instance.model.set_weights(model_weights)
+  #pro cteni metadat, nepotrebujeme cely model jen cfg
+  if cfg_only is False:
+    # Deserialize the Keras model
+    model_json = loaded_instance.model['model_json']
+    model_weights = loaded_instance.model['model_weights']
+    loaded_instance.model = model_from_json(model_json, custom_objects=loaded_instance.custom_layers)
+    loaded_instance.model.set_weights(model_weights)
 
   return loaded_instance
 
