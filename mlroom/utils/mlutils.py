@@ -6,6 +6,8 @@ from mlroom.config import MODEL_DIR
 from datetime import datetime
 import socket
 import requests
+from keras.models import model_from_json
+import pickle
 
 def send_to_telegram(message):
     apiToken = '5836666362:AAGPuzwp03tczMQTwTBiHW6VsZZ-1RCMAEE'
@@ -23,12 +25,33 @@ def get_full_filename(name, version = "1", directory = MODEL_DIR):
   file = name+'_v'+str(version)+'.pkl'
   return directory / file
 
+#LEGACY LOADER
+def load_model_legacy(name = None, version = "1", file = None, directory = MODEL_DIR):
+  if file is None:
+     filename = get_full_filename(name, version, directory)
+  else:
+     filename = directory / file
+
+  return joblib.load(filename) #somehow support , custom_objects={'SelfAttention': SelfAttention}
+
+
+#CUSTOM LAYER SUPPORTED SAVE and LOAD- https://chat.openai.com/c/d53c23d0-5029-427d-887f-6de2675c1b1f
 def load_model(name = None, version = "1", file = None, directory = MODEL_DIR):
   if file is None:
      filename = get_full_filename(name, version, directory)
   else:
      filename = directory / file
-  return joblib.load(filename)
+
+  # Load the entire instance with joblib
+  loaded_instance = joblib.load(filename)
+
+  # Deserialize the Keras model
+  model_json = loaded_instance.model['model_json']
+  model_weights = loaded_instance.model['model_weights']
+  loaded_instance.model = model_from_json(model_json, custom_objects=loaded_instance.custom_layers)
+  loaded_instance.model.set_weights(model_weights)
+
+  return loaded_instance
 
 def slice_dict_lists(d, last_item, to_tmstp = False):
   """Slices every list in the dictionary to the last last_item items.

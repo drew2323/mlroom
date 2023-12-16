@@ -31,6 +31,13 @@ class SelfAttention(Layer):
         return K.sum(output, axis=1)
 
 def Conv1DcomplexAtt_(input_shape, **params):
+    custom_layers = {
+        'SelfAttention': SelfAttention
+    }
+    # custom_layers = {
+    #     'CustomLayer1': CustomLayer1,
+    #     'CustomLayer2': CustomLayer2
+    # }
     learning_rate = params.get("learning_rate", 0.001)
     model = Sequential()
     
@@ -57,4 +64,4 @@ def Conv1DcomplexAtt_(input_shape, **params):
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
 
-    return model
+    return model, custom_layers

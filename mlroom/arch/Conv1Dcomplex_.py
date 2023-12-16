@@ -11,6 +11,8 @@ from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM, Ba
 from keras.optimizers import Adam
 
 def Conv1Dcomplex_(input_shape, **params):
+    custom_layers = {}
+
     learning_rate = params.get("learning_rate", 0.001)
     model = Sequential()
     
@@ -40,4 +42,4 @@ def Conv1Dcomplex_(input_shape, **params):
 
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
-    return model
+    return model, custom_layers

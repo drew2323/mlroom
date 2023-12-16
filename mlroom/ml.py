@@ -14,7 +14,9 @@ from mlroom.utils import ext_services as exts
 import mlroom.arch as arch
 import requests
 from keras.callbacks import EarlyStopping
+from keras.models import model_from_json
 import inspect
+import pickle
 
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
@@ -45,6 +47,13 @@ sample_indicators = {
 Zatim bud bud 1) bar nebo stanndardni indicator 2) cbar indikatory  , zatim nepodporovano spolecne protoze nemaji stejny time
 """
 class ModelML:
+    # Registry for custom layers
+    custom_layers = {}
+    #pri inciializaci modelu sem ulozime Custom Layers architectury, ktere se pak naloaduji pri importu
+    # custom_layers = {
+    #     'CustomLayer1': CustomLayer1,
+    #     'CustomLayer2': CustomLayer2
+    # }
     def __init__(self, name: str,
                 bar_features: list,
                 ind_features: list,
@@ -107,6 +116,7 @@ class ModelML:
         self.train_remove_cross_sequences = train_remove_cross_sequences
         self.scalerX = scalerX
         self.scalerY = scalerY
+        self.custom_layers = {}
 
     #inicializace modelu podle vlozeneho pluginu a pripadne dalsich
     #TODO ulozeni obsahu architekt funkce skrz inspect (k dispozici)
@@ -134,7 +144,7 @@ class ModelML:
         print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
 
         # **model_params
-        self.model = arch_function(input_shape)
+        self.model, self.custom_layers = arch_function(input_shape)
         print("COMPILED MODEL LOADED")
 
         #create input params if provided
@@ -166,10 +176,28 @@ class ModelML:
             else:
                 print("uploaded", res)
 
-    def save(self):
+    #PUVDNO SAVE bez podpory custom layers
+    def save_legacy(self):
         filename = mu.get_full_filename(self.name,self.version)
         joblib.dump(self, filename)
         print(f"model {self.name} save")
+
+    #CUSTOM LAYER SUPPORTED SAVE and LOAD- https://chat.openai.com/c/d53c23d0-5029-427d-887f-6de2675c1b1f
+    def save(self):
+        filename = mu.get_full_filename(self.name,self.version)
+        # Save the Keras model separately
+        model_json = self.model.to_json()
+        model_weights = self.model.get_weights()
+
+        # Replace the model attribute with its serialized form
+        self.model = {'model_json': model_json, 'model_weights': model_weights}
+
+        # Use joblib to serialize the entire instance
+        joblib.dump(self, filename)
+
+        # Restore the model attribute to its original state
+        self.model = model_from_json(model_json, custom_objects=self.custom_layers)
+        self.model.set_weights(model_weights)
 
     def upload(self):
         filename = mu.get_full_filename(self.name,self.version)

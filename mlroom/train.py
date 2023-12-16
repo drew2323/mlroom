@@ -221,7 +221,7 @@ def train():
         #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
         barslist, indicatorslist = model_instance.load_runners_as_list(runner_id_list=validation_runners)
         #zmergujeme vsechny data dohromady 
-        
+
         bars = mu.merge_dicts(barslist)
         indicators = mu.merge_dicts(indicatorslist)
         model_instance.validate_available_features(bars, indicators)

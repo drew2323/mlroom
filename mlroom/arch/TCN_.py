@@ -13,6 +13,9 @@ zatím jednoduchá TCN, v případě je možno vrstvit s return_sequences=True (
 """
 
 def TCN_(input_shape, **params):
+    custom_layers = {
+        'TCN': TCN
+    }
     learning_rate = 0.001
     if "learning_rate" in params:
         learning_rate = float(params["learning_rate"])
@@ -31,4 +34,4 @@ def TCN_(input_shape, **params):
 
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
     tcn_full_summary(model, expand_residual_blocks=False) 
-    return model
+    return model, custom_layers

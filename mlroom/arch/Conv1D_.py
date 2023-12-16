@@ -12,6 +12,9 @@ from keras.optimizers import Adam
 
 
 def Conv1D_(input_shape, **params):
+
+    custom_layers = {}
+
     learning_rate = 0.001
     if "learning_rate" in params:
         learning_rate = float(params["learning_rate"])
@@ -35,4 +38,4 @@ def Conv1D_(input_shape, **params):
     #print(model.__dict__)
 
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
-    return model
+    return model, custom_layers
