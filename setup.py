@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mlroom',
-    version='0.394',
+    version='0.396',
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -10,12 +10,11 @@ setup(
         'mlroom': ['config.toml'],
     },
     install_requires=[
-        'keras==2.15',  # Specify minimum version requirement
-        'tensorflow==2.15',  # Specify minimum version requirement
+        'keras>=3.0',  # Specify minimum version requirement
         'scikit-learn==1.3.2',  # Specify minimum version requirement
         'appdirs',
         'alpaca-py',
-        'joblib==1.3.2',
-        'keras-tcn'
+        'joblib==1.3.2'
+        #'keras-tcn'
     ],
 )

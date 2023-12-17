@@ -1,3 +1,5 @@
+import os
+os.environ["KERAS_BACKEND"] = "tensorflow"
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
@@ -5,7 +7,6 @@ from sklearn.model_selection import train_test_split
 import mlroom.utils.mlutils as mu
 from keras.layers import LSTM, Dense
 from keras.callbacks import EarlyStopping
-
 #import matplotlib
 #atplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
@@ -18,7 +19,6 @@ from mlroom.config import CONFIG, CONFIG_STRING
 from joblib import load
 import argparse
 import toml
-
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -134,7 +134,6 @@ import toml
 #testlist generator api
 
 # endregion
-
 def main():
     train()
 
