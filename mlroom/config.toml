@@ -13,7 +13,7 @@
     batch = "" #nad konkretnim batchem
 [model]
     name = "modelCbar"
-    version = 0.98
+    version = 0.99
     note = "data: 15.-24.11. target 30sec, complex model, Attention, test custom layer save/load"
     input_sequences = 75
     use_bars = false

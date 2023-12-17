@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from joblib import load
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
-from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM
+from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM, Input
 from keras.optimizers import Adam
 
 
@@ -20,7 +20,11 @@ def Conv1D_(input_shape, **params):
         learning_rate = float(params["learning_rate"])
     model = Sequential()
     # Convolutional layers
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
+
+    # Explicitly define the Input layer
+    model.add(Input(shape=input_shape))
+
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
     model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))

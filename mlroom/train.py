@@ -1,5 +1,5 @@
 import os
-os.environ["KERAS_BACKEND"] = "tensorflow"
+os.environ["KERAS_BACKEND"] = "jax"
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error

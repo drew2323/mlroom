@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from joblib import load
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
-from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM
+from keras.layers import Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM, Input
 from keras.optimizers import Adam
 #TODO jak ulozit architecturu a mit jit
 # import tensorflow as tf
@@ -19,8 +19,10 @@ def LSTM_(input_shape, **params):
     # Define the model
     model = Sequential()
 
+    # Explicitly define the Input layer
+    model.add(Input(shape=input_shape))
     # Add an LSTM layer with dropout
-    model.add(LSTM(units=50, return_sequences=True, input_shape=input_shape))
+    model.add(LSTM(units=50, return_sequences=True))
     model.add(Dropout(0.2))  # Dropout of 20%
     # Add another LSTM layer with dropout
     model.add(LSTM(units=50))
