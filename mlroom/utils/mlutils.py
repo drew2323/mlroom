@@ -107,7 +107,16 @@ def merge_dicts(dict_list):
 
     # return merged_dict
 
-def load_runner(runner_id, use_cbars = False):
+def convert_lists_to_numpy(data):
+    for key, value in data.items():
+        if isinstance(value, list):
+            data[key] = np.array(value)
+    return data
+
+def load_runner(runner_id, data_to_fetch, asnumpy = False):
+    """
+    Vraci pro dany runner data uvedena ve vstupnim listu data_to_fetch
+    """
     res, sada = es.get_archived_runner_detail_by_id(runner_id)
     if res == 0:
         print("ok")
@@ -115,11 +124,18 @@ def load_runner(runner_id, use_cbars = False):
         print("error",res,sada)
         raise Exception(f"ERROR loading runner {runner_id} : {res} {sada}")
 
-    #print(sada)
-    bars = sada["bars"]
-    #vracime tick indicatory if required
-    if use_cbars:
-      indicators = sada["indicators"][1]
-    else:
-      indicators = sada["indicators"][0]
-    return bars, indicators
+
+    ret_dict = {}
+    for key in data_to_fetch:
+       match key:
+          case "bars":
+             ret_dict[key] = convert_lists_to_numpy(sada["bars"] ) if asnumpy else sada["bars"] 
+          case "indicators":
+             ret_dict[key] = convert_lists_to_numpy(sada["indicators"][0]) if asnumpy else sada["indicators"][0]
+          case "cbar_indicators":
+             ret_dict[key] = convert_lists_to_numpy(sada["indicators"][1]) if asnumpy else sada["indicators"][1]
+          case "dailyBars":
+             ret_dict[key] = convert_lists_to_numpy(sada["ext_data"]["dailyBars"]) if asnumpy else sada["ext_data"]["dailyBars"]
+ 
+    return ret_dict
+

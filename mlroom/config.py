@@ -15,6 +15,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 cfg_file = os.path.join(script_dir, 'config.toml')
 CONFIG, CONFIG_STRING = load_config(cfg_file)
 
+#urcuje dostupne zdroje a jejich granularitu, od nejvyssi po nejnizsi - pouziva se pri sekvencingu
+SOURCES_GRANULARITY = dict(cbar_indicators=10, bars=9, indicators=9, dailyBars=5)
+
 MODEL_DIR = Path(__file__).parent.parent.parent.parent / "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 WEB_API_KEY="david"

@@ -147,41 +147,87 @@ def train():
     #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
 
     model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
-    source_data, target_data, rows_in_day = model_instance.load_data()
+    source_data = model_instance.load_data()
 
-    if len(target_data) == 0:
-        raise Exception("target is empty - required for TRAINING - check target column name")
+    # if len(target_data) == 0:
+    #     raise Exception("target is empty - required for TRAINING - check target column name")
+
+    #vytvorime si prepdata ve formatu
+    # highres = dict(time, feat1..N, seq_length)
+    # lowre = [(dict(time, feat1..N, seq_length)]
 
     np.set_printoptions(threshold=10,edgeitems=5)
+   # print("source_data",source_data)
+
     #print("source_data", source_data)
-    #print("target_data", target_data)
-    print("rows_in_day", rows_in_day)
-    source_data = model_instance.scalerX.fit_transform(source_data)
+
+    #nejspis az po sekvencingu?
+    #source_data = model_instance.scalerX.fit_transform(source_data)
 
     #vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
     #doplneni transformace target data
-    X_train, y_train, y_train_ref = model_instance.create_sequences(combined_data=source_data,
-                                                        target_data=target_data,
-                                                        remove_cross_sequences=model_instance.train_remove_cross_sequences,
-                                                        rows_in_day=rows_in_day)
+    #v případě multi-inputu je X_train pole vstupnich sad
 
+    # X_train, y_train, y_train_ref 
+
+    X_train, y_train = model_instance.create_sequences(source_data)
+
+    #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
+    #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
+    print(f"{X_train}")
+    print(f"{y_train}")
+
+    X_train = list(X_train.values())
+
+    print("After sequencing")
+    print("X_train")
+    for idx, x in enumerate(X_train):
+        print("input:",idx)
+        print("source:X_train", np.shape(x))
     
+    print("target:y_train", np.shape(y_train))
+  
+    #USING SINGLE SCALER
+    # Flatten each input
+    flattened_inputs = [input.reshape(input.shape[0], -1) for input in X_train]
+
+    # Concatenate flattened inputs
+    concatenated_inputs = np.hstack(flattened_inputs)    
+    # Fit the scaler on the concatenated data
+    model_instance.scalerX.fit(concatenated_inputs)
+    
+    # Transform the entire concatenated input
+    transformed_inputs = model_instance.scalerX.transform(concatenated_inputs)
+
+    #tzn. kdyz budu predikovat musim si si transformovat pole do (,270) - transformovat a pak zase zpatky .. hmm
+    #nebude lepsi tri scalery?
+
+    # Split and reshape
+    scaled_X_train = []
+    start_idx = 0
+    for original_shape in [x.shape for x in X_train]:
+        end_idx = start_idx + original_shape[1] * original_shape[2]
+        # Extract the specific section of transformed_inputs
+        transformed_section = transformed_inputs[:, start_idx:end_idx]
+        reshaped_input = transformed_section.reshape(original_shape)
+        scaled_X_train.append(reshaped_input)
+        start_idx = end_idx
+
     source_data = None
     target_data = None
 
     #zobrazit target if necessary
     #model_instance.plot_target(y_train,y_train_ref)
 
-    print("After sequencing")
-    print("source:X_train", np.shape(X_train))
-    print("target:y_train", np.shape(y_train))
+    print("After SCALING retransform")
+    print("X_train")
+    for idx, x in enumerate(scaled_X_train):
+        print("input:",idx)
+        print("source:X_train", np.shape(x))
     print("target:", y_train)
-    y_train = y_train.reshape(-1, 1)
 
-    #X_complete = np.array(X_train.copy())
-    #Y_complete = np.array(y_train.copy())
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
+    X_train = scaled_X_train
+
 
     #target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
     y_train = model_instance.scalerY.fit_transform(y_train)
@@ -193,16 +239,31 @@ def train():
 
     # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
     #nechame si takhle rozdelit i referencni sloupec
-    X_train, X_test, y_train, y_test, y_train_ref, y_test_ref = train_test_split(X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
+    y_train_ref = np.array([], dtype=np.float64)
+
+    #y_train_ref nyni pryc
+    #X_splitted = train_test_split(*X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
+    *X_train, y_train, y_test = train_test_split(*X_train, y_train, test_size=test_size, shuffle=False) #random_state=42)
+
+    #X_train je multiinput - nyni obsahuje i train(v sudych) i test(lichych) - rozdelim
+    X_test = [element for index, element in enumerate(X_train) if index % 2 != 0]
+    X_train = [element for index, element in enumerate(X_train) if index % 2 == 0]
 
     print("Splittig the data")
 
-    print("X_train", np.shape(X_train))
-    print("X_test", np.shape(X_test))
+    print("X_train")
+    for idx, x in enumerate(X_train):
+        print("input:",idx)
+        print(f"source:X_train[{idx}]", np.shape(x))
+
+    for idx, x in enumerate(X_test):
+            print("input:",idx)
+            print(f"source:X_test[{idx}]", np.shape(x))
+
     print("y_train", np.shape(y_train))
     print("y_test", np.shape(y_test))
-    print("y_test_ref", np.shape(y_test_ref))
-    print("y_train_ref", np.shape(y_train_ref))
+    # print("y_test_ref", np.shape(y_test_ref))
+    # print("y_train_ref", np.shape(y_train_ref))
 
     #print(np.shape(X_train))
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
