@@ -169,8 +169,15 @@ def train():
     #v případě multi-inputu je X_train pole vstupnich sad
 
     # X_train, y_train, y_train_ref 
+    #data = model_instance.preprocess(source_data)
+
 
     X_train, y_train = model_instance.create_sequences(source_data)
+
+    #TODO scaling idealne po zakladni transformaci a pred sequencingem
+
+
+
 
     #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
     #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
@@ -279,14 +286,16 @@ def train():
     # region Live predict
     if len(validation_runners) > 0:
         #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
-        barslist, indicatorslist = model_instance.load_runners_as_list(runner_id_list=validation_runners)
+        sources = model_instance.load_runners_as_list(runner_id_list=validation_runners)
         #zmergujeme vsechny data dohromady 
+        model_instance.validate_available_features(sources)
 
-        bars = mu.merge_dicts(barslist)
-        indicators = mu.merge_dicts(indicatorslist)
-        model_instance.validate_available_features(bars, indicators)
-        #VSTUPEM JE standardni pole v strategii
-        value = model_instance.predict(bars, indicators)
+        #sources jako pole jednotlivych dnu
+
+        #pro skalar predict potrebujeme jen jako jednu?
+
+        #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
+        value = model_instance.predict(sources[0])
         print("prediction for LIVE SIM:", value)
         # endregion
 
@@ -303,6 +312,8 @@ def train():
     #prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
     #X_test = X_complete
     #y_test = Y_complete
+
+    #toto zmenit na keras 3.0 EVALUATE
 
     X_test = model_instance.model.predict(X_test)
     X_test = model_instance.scalerY.inverse_transform(X_test)

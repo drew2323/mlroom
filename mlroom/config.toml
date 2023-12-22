@@ -12,9 +12,9 @@
     runners = ["96fad44c-7a7a-4833-8915-6cc5180593a0"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
-    name = "modelCbar"
-    version = 0.999
-    note = "data: 15.-24.11. target 30sec, complex model, Attention, test custom layer save/load"
+    name = "modelMulti"
+    version = 0.1
+    note = "multiinput test"
     train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
     #train_batch_id = "b3346be9"
     train_epochs = 1
@@ -31,14 +31,14 @@
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
 [model.target] 
-    bars = "high"
+    cbar_indicators = "target3"
     target_reference = "tick_price"
 
 [model.input.highres]
-    cbar_indicators = ["tick_price", "tick_volume"] #"market_time"
+    cbar_indicators = ["tick_price", "tick_volume","tick_trades"] #"market_time"
     sequence_length = 75
 [model.input.lowres]
-    bars = ["volume", "close"]
+    bars = ["volume", "close", "open", "high", "low"]
     indicators = ["atr10", "sl_long"]
     sequence_length = 20
 # [model.input.daily]

@@ -247,25 +247,62 @@ class ModelML:
 
     #create X data with features
     #Pro každý typ vstupu vytvorime samostatne pole vstupe dle danych indikatoru
-    def column_stack_source(self, sources_dict, verbose = 1) -> list[np.array]:
-        returned_data = []
-        for input_item, value in self.input.items():
-            print(f"Item: {input_item}")
-            if "source" in value:
-                feature_data = []
-                for source_type in value["source"]:
-                    if source_type in value:
-                        ## cbar_indicators : ["tick_price", "tick_volume"]
-                        print(f"{source_type}: {value[source_type]}")
-                        poradi_sloupcu = [feature for feature in value[source_type] if feature in sources_dict[source_type]]
-                        print("poradi sloupce v source_data", str(poradi_sloupcu))
-                        feature_data.append(np.column_stack([sources_dict[source_type][feature] for feature in value[source_type] if feature in sources_dict[source_type]]))
+    #vstup sources obsahuje dictionary se sources
+    #TOTO NEJAK VYMYSLET, ABY TO KOPIROVALO LOGIKU TRAININGU
+    #TAKY VYMYSLET ABY SE TOTO NEMUSELO VOLAT PRI KAZDEM ITERACI v RT- zychlit
+    #ORIZNEME SEKVENCI PRIMO ZDE
+    #TODO TOTO konzolidovat
 
-                if len(feature_data) >1: 
-                    combined_day_data = np.column_stack(feature_data)
-                returned_data.append(combined_day_data)
+
+    #toto bude vlastne sekvencing pro skalarni predict
+
+    def column_stack_source(self, sources, verbose = 1) -> list[np.array]:
+        #pole pro jednotlive vstupy
+        input_features = []
+        for input_item, settings in self.input.items():
+            print(f"Item: {input_item}")
+            #dotahneme delku sekvence 
+            sequence_length = settings["sequence_length"]
+            features_to_join = []
+            for source_key, features in settings.items():
+                #nejde o delku sekvence, jde o indikator
+                if source_key != "sequence_length":
+                    #pokud bude STATE tak pouzit source_var = getattr(source_key, state) #dostaneme se do state.cbar_indicators, a pak source_var[feature] = je samotna hodnota
+                    print(f"{source_key} avilable: {sources[source_key].keys()}")
+                    poradi_sloupcu = [feature for feature in sources[source_key] if feature in features]
+                    print("poradi sloupce v source_data", str(poradi_sloupcu))
+
+                    # input_feature = np.column_stack([sources[source_key][feature][-sequence_length:] for feature in  sources[source_key] if feature in features]) 
+                    # Optimized list comprehension with padding, if there is not enough data 
+                    input_feature = np.column_stack([
+                        np.pad(sources[source_key][feature][-sequence_length:], 
+                            (max(0, sequence_length - len(sources[source_key][feature][-sequence_length:])), 0), 
+                            mode='constant') 
+                        for feature in sources[source_key] if feature in features
+                    ])
+                    features_to_join.append(input_feature)
+
+            #join features with the same time and add to input list
+            input_features.append(np.concatenate(features_to_join, axis=1))
+
+        return input_features
+    
+
+        #     if "source" in value:
+        #         feature_data = []
+        #         for source_ in value["source"]:
+        #             if source_type in value:
+        #                 ## cbar_indicators : ["tick_price", "tick_volume"]
+        #                 print(f"{source_type}: {value[source_type]}")
+        #                 poradi_sloupcu = [feature for feature in value[source_type] if feature in sources_dict[source_type]]
+        #                 print("poradi sloupce v source_data", str(poradi_sloupcu))
+        #                 feature_data.append(np.column_stack([sources_dict[source_type][feature] for feature in value[source_type] if feature in sources_dict[source_type]]))
+
+        #         if len(feature_data) >1: 
+        #             combined_day_data = np.column_stack(feature_data)
+        #         returned_data.append(combined_day_data)
                         
-        return combined_day_data
+        # return combined_day_data
 
             # #create SOURCE DATA with features
             # # bars and indicators dictionary and features as input
@@ -404,6 +441,7 @@ class ModelML:
 
         return daily_dataset
 
+    #mozna by stalo za to vytvorit si oba rpistupy (day by day fit and transform)
     def create_sequences(self,source):
         X_train = {}
         y_train = []
@@ -412,6 +450,14 @@ class ModelML:
             source_dict = self.prep_data(day_data)
             #testing data override
             """"
+            input = {
+            'highres':
+                {'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'], 'sequence_length': 75}
+            'lowres':
+                {'bars': ['close', 'high', 'low', 'open', 'volume'],
+                'indicators': ['atr10', 'sl_long'], 'sequence_length': 20}
+            }
+
             source_dict = {'highres':
             {'remove_time': True, 'sequence_length': 3,
              'tick_price': [33.67, 33.57, 33.77, 33.74, 33.79, 33.74, 33.74, 33.75, 33.76],
@@ -430,7 +476,6 @@ class ModelML:
                     X_train[key] = np.concatenate([X_train[key], sequences], axis=0)
                 else:
                     X_train[key] = sequences            
-
 
             # Target sequence generation
             #
@@ -479,6 +524,26 @@ class ModelML:
             if not data['remove_time']:
                 features.insert(0, np.array(data['time']))
             
+            # print("tady jsou vsechny features pro dany vstup")
+            # print("sem by sel iterativni scaler za tento den")
+            # print(features)
+
+            # # Transpose the data so that we have samples as rows and features as columns
+            # features = np.array(features)
+            # features = features.T
+
+            # scaler = StandardScaler()
+            # # Fitting the scaler to the data and transforming the data
+            # features = scaler.fit_transform(features)
+            # print("scaler vidi")
+            # print("pocet featur:", scaler.n_features_in_)
+            # #print(scaler.feature_names_in_)
+            # print("pocet samplu:", scaler.n_samples_seen_)
+
+            # # Transpose Back
+            # features = features.T
+            # features = features.tolist()
+
             # Aligning sequences to the highest resolution
             aligned_indices = np.searchsorted(data['time'], highest_res_times, side='right') - 1
             
@@ -626,14 +691,36 @@ class ModelML:
     #pomocna sluzba, ktera provede vsechny transformace a inverzni scaling  a vyleze z nej predikce
     #vstupem je standardni format ve strategii (state.bars, state.indicators)
     #vystupem je jedna hodnota
-    def predict(self, bars, indicators) -> float:
+
+    """
+      input = {  
+      'highres':
+        {'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'], 'sequence_length': 75},
+      'lowres':
+        {'bars': ['close', 'high', 'low', 'open', 'volume'], 'indicators': ['atr10', 'sl_long'], 'sequence_length': 20},
+        }
+    """
+
+
+    #SKALAR PREDICT
+    #TODO toto zefektivnit a zhomogenizovat s TRAINEM - MUSI POUZIVAT STEJNE TOOLY
+    def predict(self, sources) -> float:
+        
         #oriznuti podle seqence - pokud je nastaveno v modelu 
-        lastNbars = mu.slice_dict_lists(bars, self.input_sequences)
-        lastNindicators =  mu.slice_dict_lists(indicators, self.input_sequences)
+        # lastNbars = mu.slice_dict_lists(bars, self.input_sequences)
+        # lastNindicators =  mu.slice_dict_lists(indicators, self.input_sequences)
         # print("last5bars", lastNbars)
         # print("last5indicators",lastNindicators)
 
-        combined_live_data = self.column_stack_source(lastNbars, lastNindicators, verbose=0)
+
+
+        transf_input = self.column_stack_source(sources, verbose=0)
+
+
+        #TBD jak se scalerem ?
+        #TODO Idelne scalovat v podobnem bode workflow pro train i predict
+
+
         #print("combined_live_data",combined_live_data)
         combined_live_data = self.scalerX.transform(combined_live_data)
         combined_live_data = np.array(combined_live_data)
