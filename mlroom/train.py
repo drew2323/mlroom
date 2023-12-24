@@ -147,6 +147,8 @@ def train():
     #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
 
     model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
+    
+    #Loads training data (only distinctive_sources required by inputs)
     source_data = model_instance.load_data()
 
     # if len(target_data) == 0:
@@ -171,13 +173,85 @@ def train():
     # X_train, y_train, y_train_ref 
     #data = model_instance.preprocess(source_data)
 
+    #this could concatenate list values of each data, while creating dayily index
+    #that would allowing to separate daily data if needed
+    def concatenate_data(sources):
+        if not sources:
+            raise ValueError("The sources list is empty")
 
-    X_train, y_train = model_instance.create_sequences(source_data)
+        # Dynamically determine the keys from the first day's data
+        top_level_keys = sources[0].keys()
+        concatenated = {key: {} for key in top_level_keys}
+        day_indexes = []
+
+        for day_index, day_data in enumerate(sources):
+            day_info = {}
+            for key in top_level_keys:
+                # Determine the start index
+                if day_index == 0:
+                    start_index = 0
+                else:
+                    # The start index for the current day is the end index of the previous day + 1
+                    start_index = day_indexes[-1][key][1]
+
+                for feature, values in day_data[key].items():
+                    # Concatenate feature data
+                    if feature not in concatenated[key]:
+                        concatenated[key][feature] = values
+                    else:
+                        concatenated[key][feature].extend(values)
+
+                # The end index for the current day
+                end_index = start_index + len(day_data[key]['time'])
+                day_info[key] = (start_index, end_index)
+            day_indexes.append(day_info)
+        return concatenated, day_indexes
+    """
+    Transforms original list structure (days as list)
+    [dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))]
+
+    by creating one flat strucutre and day indexes variable
+    dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))
+
+    day_indexes = {bars: [(0,234),(234,545),(545,88)]}
+
+        [
+        {'bars': (0, 4373), 'cbar_indicators': (0, 64559), 'indicators': (0, 4373)},
+        {'bars': (4373, 8432), 'cbar_indicators': (64559, 101597), 'indicators': (4373, 8432)}
+        ]
+
+    """
+    concatenated, day_indexes = concatenate_data(source_data)
+
+    """
+    Helper just to show
+    how to iterate over concatenated_data with day_indexes
+    """
+    def iterate_by_day(concatenated, day_indexes):
+        for day, indexes in enumerate(day_indexes):
+            print(f"Day {day + 1}:")
+            day_data = {key: {} for key in concatenated}
+
+            for key, (start_index, end_index) in indexes.items():
+                print("key:",key)
+                # Extract data points for the current day and feature
+                for feature, values in concatenated[key].items():
+                    day_data[key][feature] = values[start_index:end_index]
+
+                print("len keys:", len(list(day_data[key].keys()))," with length ",len(day_data[key]["time"]))
+            # Process the day's data as needed
+            # For example, print the day's data
+            #print(day_data)
+
+    iterate_by_day(concatenated, day_indexes)
+
+
+    #NOTE - podporit pripad, kdy TARGET je v rozliseni, ktere nemame v inputech
+    # napr. target mam v bars, ale dodavam jenom cbar_indicators
+    # resampluje, ale initial data jsou filtrovane na distinct_sources
+    X_train, y_train = model_instance.scale_and_sequence(concatenated, day_indexes)
 
     #TODO scaling idealne po zakladni transformaci a pred sequencingem
-
-
-
 
     #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
     #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
@@ -194,50 +268,8 @@ def train():
     
     print("target:y_train", np.shape(y_train))
   
-    #USING SINGLE SCALER
-    # Flatten each input
-    flattened_inputs = [input.reshape(input.shape[0], -1) for input in X_train]
-
-    # Concatenate flattened inputs
-    concatenated_inputs = np.hstack(flattened_inputs)    
-    # Fit the scaler on the concatenated data
-    model_instance.scalerX.fit(concatenated_inputs)
-    
-    # Transform the entire concatenated input
-    transformed_inputs = model_instance.scalerX.transform(concatenated_inputs)
-
-    #tzn. kdyz budu predikovat musim si si transformovat pole do (,270) - transformovat a pak zase zpatky .. hmm
-    #nebude lepsi tri scalery?
-
-    # Split and reshape
-    scaled_X_train = []
-    start_idx = 0
-    for original_shape in [x.shape for x in X_train]:
-        end_idx = start_idx + original_shape[1] * original_shape[2]
-        # Extract the specific section of transformed_inputs
-        transformed_section = transformed_inputs[:, start_idx:end_idx]
-        reshaped_input = transformed_section.reshape(original_shape)
-        scaled_X_train.append(reshaped_input)
-        start_idx = end_idx
-
     source_data = None
     target_data = None
-
-    #zobrazit target if necessary
-    #model_instance.plot_target(y_train,y_train_ref)
-
-    print("After SCALING retransform")
-    print("X_train")
-    for idx, x in enumerate(scaled_X_train):
-        print("input:",idx)
-        print("source:X_train", np.shape(x))
-    print("target:", y_train)
-
-    X_train = scaled_X_train
-
-
-    #target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
-    y_train = model_instance.scalerY.fit_transform(y_train)
 
     test_size = None
     if "test_size" in CONFIG["validation"]:

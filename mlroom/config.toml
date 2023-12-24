@@ -15,8 +15,8 @@
     name = "modelMulti"
     version = 0.1
     note = "multiinput test"
-    train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
-    #train_batch_id = "b3346be9"
+    #train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
+    train_batch_id = "b3346be9"
     train_epochs = 1
     train_remove_cross_sequences = true
     train_batch_size = 32
@@ -31,16 +31,19 @@
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
 [model.target] 
-    cbar_indicators = "target3"
+    bars = "close"
     target_reference = "tick_price"
+    scaler = "StandardScaler"
 
 [model.input.highres]
     cbar_indicators = ["tick_price", "tick_volume","tick_trades"] #"market_time"
     sequence_length = 75
+    scaler = "StandardScaler"
 [model.input.lowres]
     bars = ["volume", "close", "open", "high", "low"]
     indicators = ["atr10", "sl_long"]
     sequence_length = 20
+    scaler = "StandardScaler"
 # [model.input.daily]
 #     dailyBars = ["time", "close"]
 #     sequence_length = 20

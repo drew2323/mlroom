@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+#from sklearn.preprocessing import StandardScaler
+from sklearn import preprocessing
 from keras.models import Sequential
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM
 from mlroom.config import DATA_DIR, SOURCES_GRANULARITY
@@ -72,9 +73,6 @@ class ModelML:
                 pred_output: PredOutput = PredOutput.LINEAR,
                 #architecture settings from TOML file
                 architecture: dict = None,
-                #standardne StandardScaler
-                scalerX: StandardScaler  = StandardScaler(),
-                scalerY: StandardScaler = StandardScaler(),
                 # model: Sequential = Sequential(),
                 cfg: dict = None, #whole self.cfguration
                 cfg_toml: str = None #whole configuration in unparsed toml for later use
@@ -96,18 +94,33 @@ class ModelML:
         self.metadata = dict(cfg=cfg, cfg_toml=cfg_toml)
         self.pred_output: PredOutput = pred_output
         self.model = Sequential()
+        self.target = target
 
         #sortneme vsechny listy
         sort_input_lists(input)
 
         self.input = input
 
-        # Extracting distinct values of the sources
+        # Extracting distinct values of the sources and initi the scalers 
+        # Initializing scalersX (now separate scaler for each input. Type of scaler defined here (standard/minMax)
+        # TODO: separate scaler for feature
         self.distinct_sources = set()
+        self.scalersX = {}
+       #INIT scalersX for each input
         for key, value in self.input.items():
             for k in value:
+                if value.get("scaler", False):
+                    # Dynamically getting the scaler class based on the name
+                    # Initializing the scaler
+                    ScalerClass = getattr(preprocessing, value["scaler"])
+                    self.scalersX[key] = ScalerClass()
+                #add distinct sources
                 if k in list(SOURCES_GRANULARITY.keys()):
                     self.distinct_sources.add(k)
+
+        #INIT scalerY (scaler from target settings)
+        ScalerClass = getattr(preprocessing, target.get("scaler", "StandardScaler"))
+        self.scalerY = ScalerClass()
 
         #Extract all features grouped by distinc_sources (ie. bars = time, close cbars_indicators = time, close -..)
         self.features_required= {}
@@ -133,16 +146,12 @@ class ModelML:
         self.train_runner_ids = train_runner_ids
         self.train_batch_id = train_batch_id
         self.train_batch_size = train_batch_size
-        #target cílový sloupec, který je používám přímo nebo transformován na binary
-        self.target = target
         self.train_target_steps = train_target_steps
         self.train_target_transformation = train_target_transformation
 
         self.train_epochs = train_epochs
         #keep cross sequences between runners
         self.train_remove_cross_sequences = train_remove_cross_sequences
-        self.scalerX = scalerX
-        self.scalerY = scalerY
         self.custom_layers = {}
 
     #inicializace modelu podle vlozeneho pluginu a pripadne dalsich
@@ -255,7 +264,8 @@ class ModelML:
 
 
     #toto bude vlastne sekvencing pro skalarni predict
-
+   
+    #TODO na platforme nejak rychlit, init jen jendou
     def column_stack_source(self, sources, verbose = 1) -> list[np.array]:
         #pole pro jednotlive vstupy
         input_features = []
@@ -266,7 +276,7 @@ class ModelML:
             features_to_join = []
             for source_key, features in settings.items():
                 #nejde o delku sekvence, jde o indikator
-                if source_key != "sequence_length":
+                if source_key not in ["sequence_length", "scaler"]:
                     #pokud bude STATE tak pouzit source_var = getattr(source_key, state) #dostaneme se do state.cbar_indicators, a pak source_var[feature] = je samotna hodnota
                     print(f"{source_key} avilable: {sources[source_key].keys()}")
                     poradi_sloupcu = [feature for feature in sources[source_key] if feature in features]
@@ -397,18 +407,20 @@ class ModelML:
 
         return top_key_with_max_value        
 
-    def prep_data(self, daydata):
+    #NEJSPIS pridat DAY_INDEXING sem
+    def prep_data(self, concat_data, day_indexes):
 
         """
-        Creates dataset for a day
+        Creates dataset for each input
             source_dict = {'highres':
-                            {'remove_time': True,
+                            {'day_index':}
+                            {'sampling_time': [1,2,3,4,5,6,7,8,9,10],
                             'sequence_length': 3,
                             'tick_price': [33.67, 33.57, 33.77, 33.74, 33.79, 33.74, 33.74, 33.75, 33.76],
                             'time': [1,2,3,4,5,6,7,8,9,10],
                             'tick_volume': [1,2,3,4,5,6,7,8,9,10]},
                         'lowres':
-                            {'remove_time': True,
+                            {'sampling_time': [3,5,7,9],
                             'sequence_length': 2,
                             'close': [33.75, 33.815, 33.8, 33.8],
                             'time': [3,5,7,9],
@@ -416,33 +428,147 @@ class ModelML:
                             'atr10': [0.24, 0.17, 0.1367, 0.1125],
                             'sl_long': [33.27, 33.474999999999994, 33.526599999999995, 33.574999999999996]},
         }
+
+                input = {
+                    'highres':
+                        {'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'],
+                        {'sequence_length': 75}
+                        {'scaler': "StandardScaler"}
+                        
+                    'lowres':
+                        {'bars': ['close', 'high', 'low', 'open', 'volume'],
+                        'indicators': ['atr10', 'sl_long'],
+                        'sequence_length': 20},
+                        {'scaler': "StandardScaler"}
+                    }
         """
 
         ##bereme vzdy time (ten pak mazeme pokud neni pozadovan) a pak dle nastaveni
-        def create_dataset(conf_key):
-            dataset = dict(remove_time=True, sequence_length=self.input[conf_key]['sequence_length'])
+        def create_dataset(conf_key, day_indexes):
+            dataset = dict(sequence_length=self.input[conf_key]['sequence_length'])
 
+            #iterujeme nad oblastmi a z oblastí vytahneme z nich featury, ktere pozadujeme
             for source_key, features in self.input[conf_key].items():
-                if source_key in daydata and source_key != 'sequence_length':
-                    for feature in features:
-                        dataset[feature] = daydata[source_key][feature]
-                        #pokud je ve feature time, ve vystupu jej nemazeme-jako obvykle
-                        if feature == "time":
-                            dataset["remove_time"] = False
-                        if dataset.get("time",False) is False:
-                            dataset["time"] = daydata[source_key]['time']
+                if source_key not in ['sequence_length','scaler']:
+                    # dataset["areas_included"] = dataset.get("areas_included", []).append(source_key)
+
+                    #pro kazdy vstup pridanem sampling_time a day_index
+                    #(i kdyz je vstup slozeny ze dvou oblasti (bars, indicators) tak sampling_time a day_index
+                    #bereme vzdy z prvniho - JSOU VZDY STEJNE
+                    if dataset.get("sampling_time", None) is None:
+                        #time je ve zdrojovych datech vzdy (tbd zmena az se static indikatory)
+                        dataset["sampling_time"] = concat_data[source_key]['time']
+                    #ulozime day indexy dane oblasti (bars, cbars_indicators ...)
+                    if dataset.get("day_indexes", None) is None:
+                        dataset["day_indexes"] = [row[source_key] for row in day_indexes]
+
+                    if source_key in concat_data:
+                        for feature in features:
+                            #pridavame vsechny pozadovane featury z oblasti
+                            dataset[feature] = concat_data[source_key][feature]
+
             return dataset
 
         
-        daily_dataset = {}
+        dataset = {}
 
         for key in self.input:
-                daily_dataset[key] = create_dataset(key)
+                dataset[key] = create_dataset(key, day_indexes)
 
-        return daily_dataset
+        return dataset
+
+    #vstupuje cely datase a zaroven index umoznujici daily data [(0,118),(119,250)]
+    def create_sequences(self,source, day_indexes):
+        X_train = {}
+        y_train = []
+
+        #muze mi vytvorit source_dict pro cely dataset
+        source_dict = self.prep_data(source, day_indexes)
+        #testing data override
+        """"
+        input = {
+        'highres':
+            {'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'], 
+            'sequence_length': 75}
+            'scaler': 'XXX'}
+        'lowres':
+            {'bars': ['close', 'high', 'low', 'open', 'volume'],
+            'indicators': ['atr10', 'sl_long'], 
+            'sequence_length': 20}
+            'scaler': 'XXX'}
+        }
+
+        #tento format upravit, aby obsahoval pro kazdy input dalsi pomocny atribut "sampling_time" 
+        - podle ktereho se budou zarovnavat sekvence a ktery nebude ve vystupu
+        - diky tomu remove_time muze jit pryc
+
+            source_dict = {'highres':
+                            {'day_index':}
+                            {'sampling_time': [1,2,3,4,5,6,7,8,9,10],
+                            'sequence_length': 3,
+                            'tick_price': [33.67, 33.57, 33.77, 33.74, 33.79, 33.74, 33.74, 33.75, 33.76],
+                            'time': [1,2,3,4,5,6,7,8,9,10],
+                            'tick_volume': [1,2,3,4,5,6,7,8,9,10]},
+                        'lowres':
+                            {'sampling_time': [3,5,7,9],
+                            'sequence_length': 2,
+                            'close': [33.75, 33.815, 33.8, 33.8],
+                            'time': [3,5,7,9],
+                            'volume': [6499092, 46790, 25000, 14643],
+                            'atr10': [0.24, 0.17, 0.1367, 0.1125],
+                            'sl_long': [33.27, 33.474999999999994, 33.526599999999995, 33.574999999999996]},
+        }
+
+        pole dennich indexů
+         indexes = 
+                [{'indicators': (0, 4373), 'bars': (0, 4373), 'cbar_indicators': (0, 64559)}
+                [{'indicators': (4373, 8432), 'bars': (4373, 8432), 'cbar_indicators': (64559, 101597)}
+
+        """
+        
+        #iteratujeme na kazdy den
+        #for day_data in tqdm(source):
+        for day, indexes in enumerate(day_indexes):
+
+            daily_sequences = ModelML.create_daily_sequences(source_dict, self.highest_res_key, indexes)
+            
+            for key, sequences in daily_sequences.items():
+                if key in X_train:
+                    X_train[key] = np.concatenate([X_train[key], sequences], axis=0)
+                else:
+                    X_train[key] = sequences            
+
+            # Target sequence generation
+            #
+            #1.If the target is from the highest resolution input: Use the target data as is.
+            #2.If the target is from a lower resolution input: Resample the target data to the 
+            #   highest resolution by repeating the last known value until a new value is known based on time.
+            target_source, target_feature = list(self.target.items())[0]
+            if target_source in day_data and target_feature in day_data[target_source]:
+
+
+                #target_data = source_[target_source][target_feature]
+                if target_source in list(source_dict[self.highest_res_key].keys()):
+                    # Use target data as is for the highest resolution
+                    target_data = source_dict[self.highest_res_key][target_source][target_feature]
+                    y_train += target_data
+                else:
+                    # Resample target data to highest resolution
+                    #TODO toto predelat na vecorizaci se zachovanim logiky
+                    resampled_target_data = self.resample_to_higher_resolution(day_data, target_source, source_dict, target_feature)
+                    y_train += resampled_target_data
+            else:
+                raise Exception("Target not present")
+
+        y_train = np.array(y_train)
+        y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
+
+        return X_train, y_train
+
+
 
     #mozna by stalo za to vytvorit si oba rpistupy (day by day fit and transform)
-    def create_sequences(self,source):
+    def create_sequences_old_working(self,source):
         X_train = {}
         y_train = []
         #iteratujeme na kazdy den
@@ -510,19 +636,185 @@ class ModelML:
     #zda interpolaci nebo last value
         
     #NYNI BY DEFAULT LAST VALUE
+    #indexes = denni index, 
+    
+    def scale_and_sequence(self, concat_data, day_indexes):
+
+        source_dict = self.prep_data(concat_data, day_indexes)
+
+        """"
+        input = {
+        'highres':
+            {'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'], 'sequence_length': 75}
+        'lowres':
+            {'bars': ['close', 'high', 'low', 'open', 'volume'],
+            'indicators': ['atr10', 'sl_long'], 'sequence_length': 20}
+        }
+
+        #tento format upravit, aby obsahoval pro kazdy input dalsi pomocny atribut "sampling_time" 
+        - podle ktereho se budou zarovnavat sekvence a ktery nebude ve vystupu
+        - diky tomu remove_time muze jit pryc
+
+            source_dict = {'highres':
+                            {'day_index':}
+                            {'sampling_time': [1,2,3,4,5,6,7,8,9,10],
+                            'sequence_length': 3,
+                            'tick_price': [33.67, 33.57, 33.77, 33.74, 33.79, 33.74, 33.74, 33.75, 33.76],
+                            'time': [1,2,3,4,5,6,7,8,9,10],
+                            'tick_volume': [1,2,3,4,5,6,7,8,9,10]},
+                        'lowres':
+                            {'sampling_time': [3,5,7,9],
+                            'sequence_length': 2,
+                            'close': [33.75, 33.815, 33.8, 33.8],
+                            'time': [3,5,7,9],
+                            'volume': [6499092, 46790, 25000, 14643],
+                            'atr10': [0.24, 0.17, 0.1367, 0.1125],
+                            'sl_long': [33.27, 33.474999999999994, 33.526599999999995, 33.574999999999996]},
+        }
+
+        pole dennich indexů
+         indexes = 
+                [{'indicators': (0, 4373), 'bars': (0, 4373), 'cbar_indicators': (0, 64559)}
+                [{'indicators': (4373, 8432), 'bars': (4373, 8432), 'cbar_indicators': (64559, 101597)}
+
+        """
+
+        X_train = {}
+        y_train = {}
+        excluded_keys = ['day_indexes','sampling_time', 'sequence_length']
+
+        #TODO !!!
+        #MUSIM SI TO NAKRESLIT NA PORADNY PAPIR A VICE MONITORU
+
+        highest_res_data = source_dict[self.highest_res_key]
+        #TODO toto by šlo paralelizovat, je zpracováváno nezávisle
+        #zde iterujeme nad inputy (highres, lowres...)
+        for key, data in source_dict.items():
+            sequence_length = data['sequence_length']
+            print("INPUT:", key)
+            #vytahneme vsechny featury a jejich data
+            features = [np.array(data[feature]) for feature in data if feature not in excluded_keys]
+            print("poradi sloupcu ", str([feature for feature in data if feature not in excluded_keys]))
+            #TODO not used - jelikoz jsou vsechny featiure ve stejnem sampling rate, pouziju prvni pro nasledne dohledani day indexu
+            #first_feature = next((feature for feature in data if feature not in excluded_keys), None)
+
+            #provedeme scaling celeho vstupu a pak tento scalovany vstup a pak tento scalovany vstup opracujeme skrz dny
+
+            
+            print("tady jsou vsechny features pro dany vstup")
+            print("sem by sel iterativni scaler za tento den")
+            print("features pred scalingem", features)
+
+            # Transpose the data so that we have samples as rows and features as columns
+            features = np.array(features)
+            features = features.T
+
+            #zatim scalerX je definovy na zacatku pro kazdy vstup
+            scaler = self.scalersX[key].fit_transform(features)
+
+            print("scaler vidi")
+            print("pocet featur:", scaler.n_features_in_)
+            #print(scaler.feature_names_in_)
+            print("pocet samplu:", scaler.n_samples_seen_)
+
+            # Transpose Back
+            features = [row for row in features]
+
+            print("features po scalingu", features)
+            #scalovany vstup opracujeme na dny
+            #pripadne muzeme zapracovat optional iterative scaler
+
+            #tady az teprve zacneme DAY ITEARATION nad indexy tohoto vstupu
+            daily_sequences = []
+            for day, (start_idx, end_idx) in enumerate(data["day_indexes"]):
+
+                #SEQUENCES per DAY
+                #vezmu si pouze denni slice z features start_idx, end_idx
+                #CHATGPT - jak to udelat?
+                # Splicing each array from start_index to end_index
+                spliced_features = [array[start_idx:end_idx] for array in features]
+
+                #uložím si sampling_time nejvyššího rozlišení toho sameho dne a jejich delku
+                (start_index_of_highest, end_index_of_higest) = source_dict[self.highest_res_key]["day_indexes"][day]
+                highest_res_times = np.array(highest_res_data['sampling_time'][start_index_of_highest:end_index_of_higest])#sem dat dailyslice
+                samples = len(highest_res_times)
+
+                # Aligning sequences to the highest resolution
+                aligned_indices = np.searchsorted(data['sampling_time'][start_idx:end_idx], highest_res_times, side='right') - 1 #slices
+                
+                # Creating sequences with padding
+                sequences = []
+                for i in tqdm(range(samples)):
+                    if aligned_indices[i] == -1:
+                        sequence = np.zeros((sequence_length, len(spliced_features)))
+                    else:
+                        start_idx = max(0, aligned_indices[i] - sequence_length + 1)
+                        sequence = [feature[start_idx:aligned_indices[i]+1] for feature in spliced_features]
+                        sequence = [np.pad(seq, (max(0, sequence_length - len(seq)), 0), mode='constant') for seq in sequence]
+                        sequence = np.stack(sequence, axis=-1)
+
+                    sequences.append(sequence)
+
+                daily_sequences.append(np.array(sequences))
+
+            ##vsechyn denni sekvence daneho klice spojime to je hotove pro dany vstup
+            daily_sequences_array = np.concatenate(daily_sequences, axis=0) 
+            X_train[key] = daily_sequences_array
+
+        ##TADY jeste target - muzeme zpracovat najednou, jen pripadne resamplovat
+        # Target sequence generation
+        #
+        #1.If the target is from the highest resolution input: Use the target data as is.
+        #2.If the target is from a lower resolution input: Resample the target data to the 
+        #   highest resolution by repeating the last known value until a new value is known based on time.
+        target_area, target_feature = list(self.target.items())[0]
+        #target_feature (tick_price) exists in highest resolution
+
+        #target_source (cbar_indicators) existuje 
+        #TODO sakra to taky nebude fungovat kdyz budu mit ve vstupu jen areu bars a target bude z indikatoru
+        #i kdyz maji spolecnou osu, tak ve areas_included nebude sakr
+
+        #pokud je delka poli target casu stejne jako sample_time nejvyssiho rozliseni, target patri sem
+        #TODO vymyslet mozna lepe?
+        if len(concat_data[target_area]["time"]) == len(source_dict[self.highest_res_key]["sampling_time"]):
+            # Use target data as is for the highest resolution
+            target_data = concat_data[target_area][target_feature]
+            y_train = target_data
+        else:
+            # Resample target data to highest resolution
+            #TODO OTESTOVAT NA MALEM SAMPLU ZDA FUNGUJE i skrz
+            #TODO toto predelat na vecorizaci se zachovanim logiky
+
+            #posilame i concat data, protoze tam jedine ted mame target
+            resampled_target_data = self.resample_to_higher_resolution(target_area, concat_data, source_dict, target_feature)
+            y_train = resampled_target_data
+
+        y_train = np.array(y_train)
+        y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
+        
+        print("Scaling y_train")
+        y_train = self.scalerY.fit_transform(y_train)
+        scaler = self.scalerY
+        print("scaler vidi")
+        print("pocet featur:", scaler.n_features_in_)
+        #print(scaler.feature_names_in_)
+        print("pocet samplu:", scaler.n_samples_seen_)
+
+        return X_train, y_train
+
     @staticmethod
-    def create_daily_sequences(source_dict, highest_res_key):
+    def create_daily_sequences_old(source_dict, highest_res_key):
         highest_res_data = source_dict[highest_res_key]
-        highest_res_times = np.array(highest_res_data['time'])
+        highest_res_times = np.array(highest_res_data['time'])#sem dat dailyslice
         samples = len(highest_res_times)
         
         output_sequences = {}
 
         for key, data in source_dict.items():
             sequence_length = data['sequence_length']
-            features = [np.array(data[feature]) for feature in data if feature not in ['time','remove_time', 'sequence_length']]
+            features = [np.array(data[feature]) for feature in data if feature not in ['time','remove_time', 'sequence_length']]#dailyslice
             if not data['remove_time']:
-                features.insert(0, np.array(data['time']))
+                features.insert(0, np.array(data['time']))#slice
             
             # print("tady jsou vsechny features pro dany vstup")
             # print("sem by sel iterativni scaler za tento den")
@@ -545,7 +837,7 @@ class ModelML:
             # features = features.tolist()
 
             # Aligning sequences to the highest resolution
-            aligned_indices = np.searchsorted(data['time'], highest_res_times, side='right') - 1
+            aligned_indices = np.searchsorted(data['time'], highest_res_times, side='right') - 1 #slices
             
             # Creating sequences with padding
             sequences = []
@@ -564,7 +856,21 @@ class ModelML:
         
         return output_sequences
 
-    def resample_to_higher_resolution(self, day_data, target_source, source_dict, target_feature):
+    def resample_to_higher_resolution(self, target_source, concat_data, source_dict, target_feature):
+        # Resample target data to the time scale of the highest resolution
+        target_time_data = concat_data[target_source]['time']
+        highest_res_time_data = source_dict[self.highest_res_key]['sampling_time']
+        resampled_data = []
+        target_index = 0
+
+        for time_point in tqdm(highest_res_time_data):
+            while target_index + 1 < len(target_time_data) and target_time_data[target_index + 1] <= time_point:
+                target_index += 1
+            resampled_data.append(concat_data[target_source][target_feature][target_index])
+
+        return resampled_data
+
+    def resample_to_higher_resolution_old(self, day_data, target_source, source_dict, target_feature):
         # Resample target data to the time scale of the highest resolution
         target_time_data = day_data[target_source]['time']
         highest_res_time_data = source_dict[self.highest_res_key]['time']
