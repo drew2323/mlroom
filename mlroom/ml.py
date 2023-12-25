@@ -296,7 +296,7 @@ class ModelML:
         #pole pro jednotlive vstupy
         input_features = []
         for input_item, settings in self.input.items():
-            print(f"Item: {input_item}")
+            #print(f"Item: {input_item}")
             #dotahneme delku sekvence 
             sequence_length = settings["sequence_length"]
             features_to_join = []
@@ -304,9 +304,9 @@ class ModelML:
                 if source_key not in ["sequence_length", "scaler"]:
                     #dotazeni ze state
                     sources = getattr(state, source_key) 
-                    print(f"{source_key} avilable: {sources.keys()}")
+                    #print(f"{source_key} avilable: {sources.keys()}")
                     poradi_sloupcu = [feature for feature in features]
-                    print("poradi sloupce v source_data", str(poradi_sloupcu))
+                    #print("poradi sloupce v source_data", str(poradi_sloupcu))
 
                     # input_feature = np.column_stack([sources[source_key][feature][-sequence_length:] for feature in  sources[source_key] if feature in features]) 
                     # Optimized list comprehension with padding, if there is not enough data 
