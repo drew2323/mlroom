@@ -106,7 +106,7 @@ class ModelML:
         # TODO: separate scaler for feature
         self.distinct_sources = set()
         self.scalersX = {}
-       #INIT scalersX for each input
+        #INIT scalersX for each input
         for key, value in self.input.items():
             for k in value:
                 if value.get("scaler", False):
@@ -118,11 +118,23 @@ class ModelML:
                 if k in list(SOURCES_GRANULARITY.keys()):
                     self.distinct_sources.add(k)
 
+        #pokud nemam v distinct sources areu targetu, tak pridam (pro situace, kdy napr. bar target a jen cbar vstup)
+        target_area = list(self.target.keys())[0]
+        if target_area not in self.distinct_sources:
+            self.distinct_sources.add(target_area)
+
+        #bezpecnejsi verze, pripadne upravit strukturu cfg
+        # for key in self.target:
+        #     if key not in ["target_reference","scaler"] and key not in self.distinct_sources:
+        #         self.distinct_sources.add(key)
+        #         break
+        
         #INIT scalerY (scaler from target settings)
         ScalerClass = getattr(preprocessing, target.get("scaler", "StandardScaler"))
         self.scalerY = ScalerClass()
 
         #Extract all features grouped by distinc_sources (ie. bars = time, close cbars_indicators = time, close -..)
+        #needed for features validation
         self.features_required= {}
         for source in self.distinct_sources:
             unique_values = set()
@@ -133,14 +145,6 @@ class ModelML:
 
         self.highest_res_key = self.get_highest_resolution()
 
-        #toto dat pric
-        self.use_bars = None
-        self.input_sequences = 333
-        self.bar_features = None
-        self.ind_features = None
-        self.use_cbars = None
-
-
         if (train_runner_ids is None or len(train_runner_ids) == 0) and train_batch_id is None:
             raise Exception("train_runner_ids nebo train_batch_id musi byt vyplnene")
         self.train_runner_ids = train_runner_ids
@@ -148,7 +152,6 @@ class ModelML:
         self.train_batch_size = train_batch_size
         self.train_target_steps = train_target_steps
         self.train_target_transformation = train_target_transformation
-
         self.train_epochs = train_epochs
         #keep cross sequences between runners
         self.train_remove_cross_sequences = train_remove_cross_sequences
@@ -206,6 +209,11 @@ class ModelML:
             #support for early stoppage
             early_stopping = EarlyStopping(**early_stopping)
             fit_params['callbacks'] = [early_stopping]
+
+        #TODO to presunout do initu, kdyz se oscedci a prejmenovat na validation_split
+        if "test_size" in self.cfg["validation"]:
+            if self.cfg["validation"]["test_size"] != 0:
+                fit_params["validation_split"] = float(self.cfg["validation"]["test_size"])
 
         res_object=self.model.fit(X_train,y_train, **fit_params)
         self.metadata["history"] = res_object.history
@@ -265,8 +273,26 @@ class ModelML:
 
     #toto bude vlastne sekvencing pro skalarni predict
    
+
+    #TODO - filter settings on source
+    # a = {
+    #     'cbar_indicators': ['tick_price', 'tick_trades', 'tick_volume'],
+    #     'bars': ['feat1']
+    # }
+
+    # b = {
+    #     'bars': {'feat1': [1, 2, 3, 4], 'FEAT2': []},
+    #     'cbar_indicators': {'tick_price': [], 'tick_trades': [], 'tick_volume': [], 'tick_neco': []}
+    # }
+
+    # for key, value in a.items():
+    #     if key in b:
+    #         filtered_b[key] = {sub_key: b[key][sub_key] for sub_key in b[key] if sub_key in value}
+
+
+
     #TODO na platforme nejak rychlit, init jen jendou
-    def column_stack_source(self, sources, verbose = 1) -> list[np.array]:
+    def column_stack_source(self, state, verbose = 1) -> list[np.array]:
         #pole pro jednotlive vstupy
         input_features = []
         for input_item, settings in self.input.items():
@@ -275,26 +301,31 @@ class ModelML:
             sequence_length = settings["sequence_length"]
             features_to_join = []
             for source_key, features in settings.items():
-                #nejde o delku sekvence, jde o indikator
                 if source_key not in ["sequence_length", "scaler"]:
-                    #pokud bude STATE tak pouzit source_var = getattr(source_key, state) #dostaneme se do state.cbar_indicators, a pak source_var[feature] = je samotna hodnota
-                    print(f"{source_key} avilable: {sources[source_key].keys()}")
-                    poradi_sloupcu = [feature for feature in sources[source_key] if feature in features]
+                    #dotazeni ze state
+                    sources = getattr(state, source_key) 
+                    print(f"{source_key} avilable: {sources.keys()}")
+                    poradi_sloupcu = [feature for feature in features]
                     print("poradi sloupce v source_data", str(poradi_sloupcu))
 
                     # input_feature = np.column_stack([sources[source_key][feature][-sequence_length:] for feature in  sources[source_key] if feature in features]) 
                     # Optimized list comprehension with padding, if there is not enough data 
                     input_feature = np.column_stack([
-                        np.pad(sources[source_key][feature][-sequence_length:], 
-                            (max(0, sequence_length - len(sources[source_key][feature][-sequence_length:])), 0), 
+                        np.pad(sources[feature][-sequence_length:], 
+                            (max(0, sequence_length - len(sources[feature][-sequence_length:])), 0), 
                             mode='constant') 
-                        for feature in sources[source_key] if feature in features
+                        for feature in features
                     ])
                     features_to_join.append(input_feature)
 
-            #join features with the same time and add to input list
-            input_features.append(np.concatenate(features_to_join, axis=1))
-
+            #join features with the same time, scale it and add to input list
+            joined_features = np.concatenate(features_to_join, axis=1)
+            joined_features = self.scalersX[input_item].transform(joined_features)
+            #reshape to 3d batch_size(1), sequence_length, feature   ()
+            #TODO optimalizovat na speed
+            joined_features = joined_features.reshape((1, joined_features.shape[0], joined_features.shape[1]))
+            input_features.append(joined_features)
+            
         return input_features
     
 
@@ -638,7 +669,8 @@ class ModelML:
     #NYNI BY DEFAULT LAST VALUE
     #indexes = denni index, 
     
-    def scale_and_sequence(self, concat_data, day_indexes):
+    #muze byt volano z train nebo evaluate, podle toho incializujeme scalery
+    def scale_and_sequence(self, concat_data, day_indexes, fit_scalers = True):
 
         source_dict = self.prep_data(concat_data, day_indexes)
 
@@ -710,15 +742,20 @@ class ModelML:
             features = features.T
 
             #zatim scalerX je definovy na zacatku pro kazdy vstup
-            scaler = self.scalersX[key].fit_transform(features)
+            if fit_scalers is True:
+                features = self.scalersX[key].fit_transform(features)
+            else:
+                features = self.scalersX[key].transform(features)
 
             print("scaler vidi")
-            print("pocet featur:", scaler.n_features_in_)
+            print("pocet featur:", self.scalersX[key].n_features_in_)
             #print(scaler.feature_names_in_)
-            print("pocet samplu:", scaler.n_samples_seen_)
+            print("pocet samplu:", self.scalersX[key].n_samples_seen_)
 
             # Transpose Back
-            features = [row for row in features]
+            # Converting to a list of three items, each being a numpy array
+            features = [features[:, i] for i in range(features.shape[1])]
+            #features = [row for row in features]
 
             print("features po scalingu", features)
             #scalovany vstup opracujeme na dny
@@ -793,7 +830,11 @@ class ModelML:
         y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
         
         print("Scaling y_train")
-        y_train = self.scalerY.fit_transform(y_train)
+        if fit_scalers is True:
+            y_train = self.scalerY.fit_transform(y_train)
+        else:
+            y_train = self.scalerY.transform(y_train)
+
         scaler = self.scalerY
         print("scaler vidi")
         print("pocet featur:", scaler.n_features_in_)
@@ -1011,35 +1052,10 @@ class ModelML:
     #SKALAR PREDICT
     #TODO toto zefektivnit a zhomogenizovat s TRAINEM - MUSI POUZIVAT STEJNE TOOLY
     def predict(self, sources) -> float:
-        
-        #oriznuti podle seqence - pokud je nastaveno v modelu 
-        # lastNbars = mu.slice_dict_lists(bars, self.input_sequences)
-        # lastNindicators =  mu.slice_dict_lists(indicators, self.input_sequences)
-        # print("last5bars", lastNbars)
-        # print("last5indicators",lastNindicators)
-
-
-
         transf_input = self.column_stack_source(sources, verbose=0)
-
-
-        #TBD jak se scalerem ?
-        #TODO Idelne scalovat v podobnem bode workflow pro train i predict
-
-
-        #print("combined_live_data",combined_live_data)
-        combined_live_data = self.scalerX.transform(combined_live_data)
-        combined_live_data = np.array(combined_live_data)
-        #print("last 5 values combined data shape", np.shape(combined_live_data))
-
-        #converts to 3D array 
-        # 1 number of samples in the array.
-        # 2 represents the sequence length.
-        # 3 represents the number of features in the data.
-        combined_live_data = combined_live_data.reshape((1, self.input_sequences, combined_live_data.shape[1]))
-
         # Make a prediction
-        prediction = self.model(combined_live_data, training=False)
+        #TODO porovnat performance s predict_on_batch
+        prediction = self.model(transf_input, training=False)
         #prediction = prediction.reshape((1, 1))
         # Convert the prediction back to the original scale
         prediction = self.scalerY.inverse_transform(prediction)

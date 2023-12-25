@@ -22,7 +22,7 @@ def Conv1D_(input_shape, **params):
     # Convolutional layers
 
     # Explicitly define the Input layer
-    model.add(Input(shape=input_shape))
+    model.add(Input(shape=input_shape[0]))
 
     model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))

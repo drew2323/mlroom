@@ -139,3 +139,72 @@ def load_runner(runner_id, data_to_fetch, asnumpy = False):
  
     return ret_dict
 
+
+def iterate_by_day(concatenated, day_indexes):
+    """
+    Helper just to show
+    how to iterate over concatenated_data with day_indexes
+    """
+    for day, indexes in enumerate(day_indexes):
+        print(f"Day {day + 1}:")
+        day_data = {key: {} for key in concatenated}
+
+        for key, (start_index, end_index) in indexes.items():
+            print("key:",key)
+            # Extract data points for the current day and feature
+            for feature, values in concatenated[key].items():
+                day_data[key][feature] = values[start_index:end_index]
+
+            print("len keys:", len(list(day_data[key].keys()))," with length ",len(day_data[key]["time"]))
+        # Process the day's data as needed
+        # For example, print the day's data
+        #print(day_data)
+
+#this could concatenate list values of each data, while creating dayily index
+#that would allowing to separate daily data if needed
+def concatenate_loaded_data(sources):
+    """
+    Transforms original list structure (days as list)
+    [dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))]
+
+    by creating one flat strucutre and day indexes variable
+    dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))
+
+    day_indexes = {bars: [(0,234),(234,545),(545,88)]}
+
+        [
+        {'bars': (0, 4373), 'cbar_indicators': (0, 64559), 'indicators': (0, 4373)},
+        {'bars': (4373, 8432), 'cbar_indicators': (64559, 101597), 'indicators': (4373, 8432)}
+        ]
+
+    """
+    if not sources:
+        raise ValueError("The sources list is empty")
+
+    # Dynamically determine the keys from the first day's data
+    top_level_keys = sources[0].keys()
+    concatenated = {key: {} for key in top_level_keys}
+    day_indexes = []
+
+    for day_index, day_data in enumerate(sources):
+        day_info = {}
+        for key in top_level_keys:
+            # Determine the start index
+            if day_index == 0:
+                start_index = 0
+            else:
+                # The start index for the current day is the end index of the previous day + 1
+                start_index = day_indexes[-1][key][1]
+
+            for feature, values in day_data[key].items():
+                # Concatenate feature data
+                if feature not in concatenated[key]:
+                    concatenated[key][feature] = values
+                else:
+                    concatenated[key][feature].extend(values)
+
+            # The end index for the current day
+            end_index = start_index + len(day_data[key]['time'])
+            day_info[key] = (start_index, end_index)
+        day_indexes.append(day_info)
+    return concatenated, day_indexes

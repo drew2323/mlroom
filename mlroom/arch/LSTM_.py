@@ -20,7 +20,7 @@ def LSTM_(input_shape, **params):
     model = Sequential()
 
     # Explicitly define the Input layer
-    model.add(Input(shape=input_shape))
+    model.add(Input(shape=input_shape[0]))
     # Add an LSTM layer with dropout
     model.add(LSTM(units=50, return_sequences=True))
     model.add(Dropout(0.2))  # Dropout of 20%

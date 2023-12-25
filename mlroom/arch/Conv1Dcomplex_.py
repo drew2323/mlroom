@@ -17,7 +17,7 @@ def Conv1Dcomplex_(input_shape, **params):
     model = Sequential()
     
     # Explicitly define the Input layer
-    model.add(Input(shape=input_shape))
+    model.add(Input(shape=input_shape[0]))
     # First Convolutional Layer
     model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
     model.add(BatchNormalization())

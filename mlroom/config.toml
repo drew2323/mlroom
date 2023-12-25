@@ -8,17 +8,17 @@
     #download_server = "5.161.179.223" #to download batches/runners
     upload = true
 [validation]
-    test_size = 0.0 #validujeme na casti testovacich dat
-    runners = ["96fad44c-7a7a-4833-8915-6cc5180593a0"] #nad seznamem runner
+    test_size = 0 #validujeme na casti testovacich dat
+    runners = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
     name = "modelMulti"
-    version = 0.1
+    version = 0.12
     note = "multiinput test"
-    #train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
-    train_batch_id = "b3346be9"
-    train_epochs = 1
-    train_remove_cross_sequences = true
+    train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
+    #train_batch_id = "b3346be9"
+    train_epochs = 3
+    train_remove_cross_sequences = true #nyni nefunguje, je true
     train_batch_size = 32
     #sem pridat batch_id a take earlystoppage params
 
@@ -31,7 +31,7 @@
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
 [model.target] 
-    bars = "close"
+    cbar_indicators = "target3"
     target_reference = "tick_price"
     scaler = "StandardScaler"
 
@@ -41,19 +41,31 @@
     scaler = "StandardScaler"
 [model.input.lowres]
     bars = ["volume", "close", "open", "high", "low"]
-    indicators = ["atr10", "sl_long"]
+    indicators = ["atr10"]
     sequence_length = 20
     scaler = "StandardScaler"
-# [model.input.daily]
-#     dailyBars = ["time", "close"]
-#     sequence_length = 20
+[model.input.daily]
+    dailyBars = ["close", "vwap", "open"]
+    sequence_length = 25
+    scaler = "StandardScaler"
 
 [model.architecture]
-    name = "LSTM2Inputs_"  #modelLSTM_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
+    name = "LSTM3Inputs_"  #modelLSTM_ LSTM2Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]
-    monitor='mean_squared_error'
+    #monitor='mean_squared_error'
+    monitor='loss'
     patience=20
     min_delta=0.0001
     mode='min'
+
+#novy format?
+# [train.sources]
+#     #train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
+#     train_batch_id = "b3346be9"
+# [train.sequencing]
+#     train_remove_cross_sequences = true
+# [train.params]
+#     epochs = 1
+#     batch_size = 32

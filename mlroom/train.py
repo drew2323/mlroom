@@ -150,101 +150,9 @@ def train():
     
     #Loads training data (only distinctive_sources required by inputs)
     source_data = model_instance.load_data()
-
-    # if len(target_data) == 0:
-    #     raise Exception("target is empty - required for TRAINING - check target column name")
-
-    #vytvorime si prepdata ve formatu
-    # highres = dict(time, feat1..N, seq_length)
-    # lowre = [(dict(time, feat1..N, seq_length)]
-
     np.set_printoptions(threshold=10,edgeitems=5)
-   # print("source_data",source_data)
 
-    #print("source_data", source_data)
-
-    #nejspis az po sekvencingu?
-    #source_data = model_instance.scalerX.fit_transform(source_data)
-
-    #vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
-    #doplneni transformace target data
-    #v případě multi-inputu je X_train pole vstupnich sad
-
-    # X_train, y_train, y_train_ref 
-    #data = model_instance.preprocess(source_data)
-
-    #this could concatenate list values of each data, while creating dayily index
-    #that would allowing to separate daily data if needed
-    def concatenate_data(sources):
-        if not sources:
-            raise ValueError("The sources list is empty")
-
-        # Dynamically determine the keys from the first day's data
-        top_level_keys = sources[0].keys()
-        concatenated = {key: {} for key in top_level_keys}
-        day_indexes = []
-
-        for day_index, day_data in enumerate(sources):
-            day_info = {}
-            for key in top_level_keys:
-                # Determine the start index
-                if day_index == 0:
-                    start_index = 0
-                else:
-                    # The start index for the current day is the end index of the previous day + 1
-                    start_index = day_indexes[-1][key][1]
-
-                for feature, values in day_data[key].items():
-                    # Concatenate feature data
-                    if feature not in concatenated[key]:
-                        concatenated[key][feature] = values
-                    else:
-                        concatenated[key][feature].extend(values)
-
-                # The end index for the current day
-                end_index = start_index + len(day_data[key]['time'])
-                day_info[key] = (start_index, end_index)
-            day_indexes.append(day_info)
-        return concatenated, day_indexes
-    """
-    Transforms original list structure (days as list)
-    [dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))]
-
-    by creating one flat strucutre and day indexes variable
-    dict(area1=dict(time=[], feature1=[]), area2=dict(time=[], feature1))
-
-    day_indexes = {bars: [(0,234),(234,545),(545,88)]}
-
-        [
-        {'bars': (0, 4373), 'cbar_indicators': (0, 64559), 'indicators': (0, 4373)},
-        {'bars': (4373, 8432), 'cbar_indicators': (64559, 101597), 'indicators': (4373, 8432)}
-        ]
-
-    """
-    concatenated, day_indexes = concatenate_data(source_data)
-
-    """
-    Helper just to show
-    how to iterate over concatenated_data with day_indexes
-    """
-    def iterate_by_day(concatenated, day_indexes):
-        for day, indexes in enumerate(day_indexes):
-            print(f"Day {day + 1}:")
-            day_data = {key: {} for key in concatenated}
-
-            for key, (start_index, end_index) in indexes.items():
-                print("key:",key)
-                # Extract data points for the current day and feature
-                for feature, values in concatenated[key].items():
-                    day_data[key][feature] = values[start_index:end_index]
-
-                print("len keys:", len(list(day_data[key].keys()))," with length ",len(day_data[key]["time"]))
-            # Process the day's data as needed
-            # For example, print the day's data
-            #print(day_data)
-
-    iterate_by_day(concatenated, day_indexes)
-
+    concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
 
     #NOTE - podporit pripad, kdy TARGET je v rozliseni, ktere nemame v inputech
     # napr. target mam v bars, ale dodavam jenom cbar_indicators
@@ -269,7 +177,6 @@ def train():
     print("target:y_train", np.shape(y_train))
   
     source_data = None
-    target_data = None
 
     test_size = None
     if "test_size" in CONFIG["validation"]:
@@ -327,18 +234,26 @@ def train():
         #pro skalar predict potrebujeme jen jako jednu?
 
         #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
-        value = model_instance.predict(sources[0])
+        # Dynamically create a state class
+        State = type('State', (object,), {**sources[0]})
+        # Create an instance of the dynamically created class
+        state = State()   
+        value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
         # endregion
 
     #EVALUATE TEST DATA - VECTOR BASED
+    #TODO toto predelat na evaluate()
     #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
     validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
     if len(validation_runners) > 0 or validation_batch is not None:
         print(f"Loading validations {validation_runners=} {validation_batch=}")
-        source_data, target_data, rows_in_day = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
-        source_data = model_instance.scalerX.fit_transform(source_data)
-        X_test, y_test, y_test_ref = model_instance.create_sequences(combined_data=source_data, target_data=target_data,remove_cross_sequences=True, rows_in_day=rows_in_day)
+        source_data = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
+        concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
+        #fit scalers false
+        X_test, y_test = model_instance.scale_and_sequence(concatenated, day_indexes, False)
+
+        X_test = list(X_test.values())
     else:
         print("For validation part of testdata is used", test_size)
     #prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
@@ -346,26 +261,28 @@ def train():
     #y_test = Y_complete
 
     #toto zmenit na keras 3.0 EVALUATE
+    result = model_instance.model.evaluate(X_test, y_test)
+    print(result)
 
-    X_test = model_instance.model.predict(X_test)
-    X_test = model_instance.scalerY.inverse_transform(X_test)
+    # X_test = model_instance.model.predict(X_test)
+    # X_test = model_instance.scalerY.inverse_transform(X_test)
 
-    #target testovacim dat proc tu je reshape?
-    #y_test.reshape(-1, 1)
-    y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
-    #celkovy mean? nebo spis vector pro graf?
-    mse = mean_squared_error(y_test, X_test)
-    print('Test MSE:', mse)
+    # #target testovacim dat proc tu je reshape?
+    # #y_test.reshape(-1, 1)
+    # y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
+    # #celkovy mean? nebo spis vector pro graf?
+    # mse = mean_squared_error(y_test, X_test)
+    # print('Test MSE:', mse)
 
-    # Plot the predicted vs. actual
-    plt.plot(y_test, label='Actual')
-    plt.plot(X_test, label='Predicted')
-    #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
-    plt.plot(y_test_ref, label='reference column - price')
-    plt.plot()
-    plt.legend()
-    plt.savefig("res_pred_act.png")
-    #plt.show()
+    # # Plot the predicted vs. actual
+    # plt.plot(y_test, label='Actual')
+    # plt.plot(X_test, label='Predicted')
+    # #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
+    # #plt.plot(y_test_ref, label='reference column - price')
+    # plt.plot()
+    # plt.legend()
+    # plt.savefig("res_pred_act.png")
+    # #plt.show()
 
 
 if __name__ == "__main__":

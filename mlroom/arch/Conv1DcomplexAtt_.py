@@ -41,7 +41,7 @@ def Conv1DcomplexAtt_(input_shape, **params):
     learning_rate = params.get("learning_rate", 0.001)
     model = Sequential()
         # Explicitly define the Input layer
-    model.add(Input(shape=input_shape))
+    model.add(Input(shape=input_shape[0]))
     
     # Convolutional Layers
     model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))

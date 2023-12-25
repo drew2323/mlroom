@@ -6,7 +6,7 @@ def GRU_(input_shape, **params):
     model = Sequential()
 
     # Explicitly define the Input layer
-    model.add(Input(shape=input_shape))
+    model.add(Input(shape=input_shape[0]))
     # Add a GRU layer with dropout
     model.add(GRU(units=50, return_sequences=True))
     model.add(Dropout(0.2))  # Dropout of 20%
