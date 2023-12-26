@@ -1,23 +1,23 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    download_server = "0.0.0.0"
-    upload_server = "0.0.0.0"
+    #download_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
 
     #test 5.161.179.223
-    #upload_server = "5.161.179.223" #where to upload model
-    #download_server = "5.161.179.223" #to download batches/runners
+    upload_server = "5.161.179.223" #where to upload model
+    download_server = "5.161.179.223" #to download batches/runners
     upload = true
 [validation]
-    test_size = 0 #validujeme na casti testovacich dat
-    runners = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"] #nad seznamem runner
+    test_size = 0.1 #validujeme na casti testovacich dat
+    runners = ["fde1d7ac-d0e5-4473-b366-657807b7690c"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
     name = "LSTMAtt"
-    version = 0.1
+    version = 0.11
     note = "multiinput test"
-    train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
-    #train_batch_id = "b3346be9"
-    train_epochs = 3
+    #train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
+    train_batch_id = "1ca02a05"
+    train_epochs = 1
     train_remove_cross_sequences = true #nyni nefunguje, je true
     train_batch_size = 32
     #sem pridat batch_id a take earlystoppage params
@@ -45,7 +45,7 @@
     sequence_length = 30
     scaler = "StandardScaler"
 [model.input.daily]
-    dailyBars = ["close", "vwap", "open"]
+    dailyBars = ["close", "vwap", "open", "volume", "trades"]
     sequence_length = 25
     scaler = "StandardScaler"
 
