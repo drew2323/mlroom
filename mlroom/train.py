@@ -19,6 +19,8 @@ from mlroom.config import CONFIG, CONFIG_STRING
 from joblib import load
 import argparse
 import toml
+import time
+
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -147,44 +149,36 @@ def train():
     #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
 
     model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
-    source_data, target_data, rows_in_day = model_instance.load_data()
-
-    if len(target_data) == 0:
-        raise Exception("target is empty - required for TRAINING - check target column name")
-
-    np.set_printoptions(threshold=10,edgeitems=5)
-    #print("source_data", source_data)
-    #print("target_data", target_data)
-    print("rows_in_day", rows_in_day)
-    source_data = model_instance.scalerX.fit_transform(source_data)
-
-    #vytvořeni sekvenci po vstupních sadách  (např. 10 barů) - výstup 3D např. #X_train (6205, 10, 14)
-    #doplneni transformace target data
-    X_train, y_train, y_train_ref = model_instance.create_sequences(combined_data=source_data,
-                                                        target_data=target_data,
-                                                        remove_cross_sequences=model_instance.train_remove_cross_sequences,
-                                                        rows_in_day=rows_in_day)
-
     
-    source_data = None
-    target_data = None
+    #Loads training data (only distinctive_sources required by inputs)
+    source_data = model_instance.load_data()
+    np.set_printoptions(threshold=10,edgeitems=5)
 
-    #zobrazit target if necessary
-    #model_instance.plot_target(y_train,y_train_ref)
+    concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
+
+    #NOTE - podporit pripad, kdy TARGET je v rozliseni, ktere nemame v inputech
+    # napr. target mam v bars, ale dodavam jenom cbar_indicators
+    # resampluje, ale initial data jsou filtrovane na distinct_sources
+    X_train, y_train = model_instance.scale_and_sequence(concatenated, day_indexes)
+
+    #TODO scaling idealne po zakladni transformaci a pred sequencingem
+
+    #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
+    #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
+    print(f"{X_train}")
+    print(f"{y_train}")
+
+    X_train = list(X_train.values())
 
     print("After sequencing")
-    print("source:X_train", np.shape(X_train))
+    print("X_train")
+    for idx, x in enumerate(X_train):
+        print("input:",idx)
+        print("source:X_train", np.shape(x))
+    
     print("target:y_train", np.shape(y_train))
-    print("target:", y_train)
-    y_train = y_train.reshape(-1, 1)
-
-    #X_complete = np.array(X_train.copy())
-    #Y_complete = np.array(y_train.copy())
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
-
-    #target scaluji az po transformaci v create sequence -narozdil od X je stejny shape
-    y_train = model_instance.scalerY.fit_transform(y_train)
+  
+    source_data = None
 
     test_size = None
     if "test_size" in CONFIG["validation"]:
@@ -193,16 +187,31 @@ def train():
 
     # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
     #nechame si takhle rozdelit i referencni sloupec
-    X_train, X_test, y_train, y_test, y_train_ref, y_test_ref = train_test_split(X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
+    y_train_ref = np.array([], dtype=np.float64)
+
+    #y_train_ref nyni pryc
+    #X_splitted = train_test_split(*X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
+    *X_train, y_train, y_test = train_test_split(*X_train, y_train, test_size=test_size, shuffle=False) #random_state=42)
+
+    #X_train je multiinput - nyni obsahuje i train(v sudych) i test(lichych) - rozdelim
+    X_test = [element for index, element in enumerate(X_train) if index % 2 != 0]
+    X_train = [element for index, element in enumerate(X_train) if index % 2 == 0]
 
     print("Splittig the data")
 
-    print("X_train", np.shape(X_train))
-    print("X_test", np.shape(X_test))
+    print("X_train")
+    for idx, x in enumerate(X_train):
+        print("input:",idx)
+        print(f"source:X_train[{idx}]", np.shape(x))
+
+    for idx, x in enumerate(X_test):
+            print("input:",idx)
+            print(f"source:X_test[{idx}]", np.shape(x))
+
     print("y_train", np.shape(y_train))
     print("y_test", np.shape(y_test))
-    print("y_test_ref", np.shape(y_test_ref))
-    print("y_train_ref", np.shape(y_train_ref))
+    # print("y_test_ref", np.shape(y_test_ref))
+    # print("y_train_ref", np.shape(y_train_ref))
 
     #print(np.shape(X_train))
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
@@ -211,57 +220,98 @@ def train():
     print("TRAINGING FINISHED")
     #VALIDATION PART
 
-    print("STARTING VALIDATION")
+    print("STARTING VALIDATION - SCALAR")
     #TBD db layer
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
 
     # region Live predict
     if len(validation_runners) > 0:
         #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
-        barslist, indicatorslist = model_instance.load_runners_as_list(runner_id_list=validation_runners)
+        sources = model_instance.load_runners_as_list(runner_id_list=validation_runners)
         #zmergujeme vsechny data dohromady 
+        model_instance.validate_available_features(sources)
 
-        bars = mu.merge_dicts(barslist)
-        indicators = mu.merge_dicts(indicatorslist)
-        model_instance.validate_available_features(bars, indicators)
-        #VSTUPEM JE standardni pole v strategii
-        value = model_instance.predict(bars, indicators)
+        #sources jako pole jednotlivych dnu
+
+        #pro skalar predict potrebujeme jen jako jednu?
+
+        #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
+        # Dynamically create a state class
+        start_time = time.time()  # Start timing
+        State = type('State', (object,), {**sources[0]})
+        # Create an instance of the dynamically created class
+        state = State()   
+        value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
         # endregion
+        end_time = time.time()  # End timing
+        print(f"Time taken for this iteration: {end_time - start_time} seconds")
 
+
+    print("STARTING EVALUATION - VECTOR BASED")
     #EVALUATE TEST DATA - VECTOR BASED
+    #TODO toto predelat na evaluate()
     #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
     validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
     if len(validation_runners) > 0 or validation_batch is not None:
         print(f"Loading validations {validation_runners=} {validation_batch=}")
-        source_data, target_data, rows_in_day = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
-        source_data = model_instance.scalerX.fit_transform(source_data)
-        X_test, y_test, y_test_ref = model_instance.create_sequences(combined_data=source_data, target_data=target_data,remove_cross_sequences=True, rows_in_day=rows_in_day)
+        source_data = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
+        concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
+        #fit scalers false
+        X_test, y_test = model_instance.scale_and_sequence(concatenated, day_indexes, False)
+        X_test = list(X_test.values())
     else:
         print("For validation part of testdata is used", test_size)
     #prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
     #X_test = X_complete
     #y_test = Y_complete
 
-    X_test = model_instance.model.predict(X_test)
-    X_test = model_instance.scalerY.inverse_transform(X_test)
+    #toto zmenit na keras 3.0 EVALUATE
+    result = model_instance.model.evaluate(X_test, y_test)
+    print(result)
 
-    #target testovacim dat proc tu je reshape?
-    #y_test.reshape(-1, 1)
-    y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
-    #celkovy mean? nebo spis vector pro graf?
-    mse = mean_squared_error(y_test, X_test)
-    print('Test MSE:', mse)
+    print("ITERATIONs - to measure INFER SPEED")
+    total_time = 0
+    for idx, val in enumerate(X_test[0]):
+        one_sample = []
+        for sample in X_test:
+            # Reshape the sample if necessary to match LSTM input requirements
+            # E.g., sample might need to be reshaped to (1, time_steps, features)
+            one_sample.append(sample[idx].reshape(1, -1, sample[idx].shape[-1]))
 
-    # Plot the predicted vs. actual
-    plt.plot(y_test, label='Actual')
-    plt.plot(X_test, label='Predicted')
-    #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
-    plt.plot(y_test_ref, label='reference column - price')
-    plt.plot()
-    plt.legend()
-    plt.savefig("res_pred_act.png")
-    #plt.show()
+        start_time = time.time()  # Start timing
+        # Feed the reshaped sample to your LSTM model
+        prediction = model_instance.model.predict_on_batch(one_sample)
+        #prediction = model_instance.model(one_sample, training=False)
+        prediction = model_instance.scalerY.inverse_transform(prediction)
+        end_time = time.time()  # End timing
+        #print("val:", prediction)
+        #print(f"IT time: {end_time - start_time} seconds")
+        iteration_time = end_time - start_time
+        total_time += iteration_time
+
+    average_time = total_time / len(X_test[0])
+    print(f"Average time per iteration: {average_time} seconds")
+
+    # X_test = model_instance.model.predict(X_test)
+    # X_test = model_instance.scalerY.inverse_transform(X_test)
+
+    # #target testovacim dat proc tu je reshape?
+    # #y_test.reshape(-1, 1)
+    # y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
+    # #celkovy mean? nebo spis vector pro graf?
+    # mse = mean_squared_error(y_test, X_test)
+    # print('Test MSE:', mse)
+
+    # # Plot the predicted vs. actual
+    # plt.plot(y_test, label='Actual')
+    # plt.plot(X_test, label='Predicted')
+    # #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
+    # #plt.plot(y_test_ref, label='reference column - price')
+    # plt.plot()
+    # plt.legend()
+    # plt.savefig("res_pred_act.png")
+    # #plt.show()
 
 
 if __name__ == "__main__":

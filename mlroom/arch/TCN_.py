@@ -22,7 +22,7 @@ def TCN_(input_shape, **params):
     model = Sequential()
     # Building the TCN model
     model.add(
-        TCN(input_shape=input_shape, 
+        TCN(input_shape=input_shape[0], 
             nb_filters=128, 
             kernel_size=5, #If sequence heavily depends on t-1 and t-2, but less on the rest, then choose a kernel size of 2/3.
             dilations=[1, 2, 4, 8], 
