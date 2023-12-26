@@ -19,6 +19,8 @@ from mlroom.config import CONFIG, CONFIG_STRING
 from joblib import load
 import argparse
 import toml
+import time
+
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -218,7 +220,7 @@ def train():
     print("TRAINGING FINISHED")
     #VALIDATION PART
 
-    print("STARTING VALIDATION")
+    print("STARTING VALIDATION - SCALAR")
     #TBD db layer
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
 
@@ -235,13 +237,18 @@ def train():
 
         #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
         # Dynamically create a state class
+        start_time = time.time()  # Start timing
         State = type('State', (object,), {**sources[0]})
         # Create an instance of the dynamically created class
         state = State()   
         value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
         # endregion
+        end_time = time.time()  # End timing
+        print(f"Time taken for this iteration: {end_time - start_time} seconds")
 
+
+    print("STARTING EVALUATION - VECTOR BASED")
     #EVALUATE TEST DATA - VECTOR BASED
     #TODO toto predelat na evaluate()
     #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
@@ -252,7 +259,6 @@ def train():
         concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
         #fit scalers false
         X_test, y_test = model_instance.scale_and_sequence(concatenated, day_indexes, False)
-
         X_test = list(X_test.values())
     else:
         print("For validation part of testdata is used", test_size)
@@ -263,6 +269,29 @@ def train():
     #toto zmenit na keras 3.0 EVALUATE
     result = model_instance.model.evaluate(X_test, y_test)
     print(result)
+
+    print("ITERATIONs - to measure INFER SPEED")
+    total_time = 0
+    for idx, val in enumerate(X_test[0]):
+        one_sample = []
+        for sample in X_test:
+            # Reshape the sample if necessary to match LSTM input requirements
+            # E.g., sample might need to be reshaped to (1, time_steps, features)
+            one_sample.append(sample[idx].reshape(1, -1, sample[idx].shape[-1]))
+
+        start_time = time.time()  # Start timing
+        # Feed the reshaped sample to your LSTM model
+        prediction = model_instance.model.predict_on_batch(one_sample)
+        #prediction = model_instance.model(one_sample, training=False)
+        prediction = model_instance.scalerY.inverse_transform(prediction)
+        end_time = time.time()  # End timing
+        #print("val:", prediction)
+        #print(f"IT time: {end_time - start_time} seconds")
+        iteration_time = end_time - start_time
+        total_time += iteration_time
+
+    average_time = total_time / len(X_test[0])
+    print(f"Average time per iteration: {average_time} seconds")
 
     # X_test = model_instance.model.predict(X_test)
     # X_test = model_instance.scalerY.inverse_transform(X_test)

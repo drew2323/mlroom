@@ -21,7 +21,7 @@ import pickle
 import pandas as pd
 from collections import defaultdict
 from tqdm import tqdm
-
+import time
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
 
@@ -195,7 +195,7 @@ class ModelML:
         print("FUNCTION TO CALL",arch_function)
 
         self.metadata["arch_function"] =  inspect.getsource(arch_function)
-        print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
+        #print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
 
         # **model_params
         self.model, self.custom_layers = arch_function(input_shape)
@@ -733,9 +733,9 @@ class ModelML:
             #provedeme scaling celeho vstupu a pak tento scalovany vstup a pak tento scalovany vstup opracujeme skrz dny
 
             
-            print("tady jsou vsechny features pro dany vstup")
-            print("sem by sel iterativni scaler za tento den")
-            print("features pred scalingem", features)
+            #print("tady jsou vsechny features pro dany vstup")
+            #print("sem by sel iterativni scaler za tento den")
+            #print("features pred scalingem", features)
 
             # Transpose the data so that we have samples as rows and features as columns
             features = np.array(features)
@@ -757,7 +757,7 @@ class ModelML:
             features = [features[:, i] for i in range(features.shape[1])]
             #features = [row for row in features]
 
-            print("features po scalingu", features)
+            #print("features po scalingu", features)
             #scalovany vstup opracujeme na dny
             #pripadne muzeme zapracovat optional iterative scaler
 
@@ -1055,10 +1055,11 @@ class ModelML:
         transf_input = self.column_stack_source(sources, verbose=0)
         # Make a prediction
         #TODO porovnat performance s predict_on_batch
-        prediction = self.model(transf_input, training=False)
-        #prediction = prediction.reshape((1, 1))
-        # Convert the prediction back to the original scale
+        #start_time = time.time() 
+        prediction = self.model.predict_on_batch(transf_input)
         prediction = self.scalerY.inverse_transform(prediction)
+        #end_time = time.time() 
+        #print(f"TIME: {end_time-start_time}s")
         return float(prediction)
 
     def plot_target(self, y_train,y_train_ref):   #zobrazime si transformovany target a jeho referncni sloupec

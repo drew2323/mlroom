@@ -12,8 +12,8 @@
     runners = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
-    name = "modelMulti"
-    version = 0.12
+    name = "LSTMAtt"
+    version = 0.1
     note = "multiinput test"
     train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
     #train_batch_id = "b3346be9"
@@ -42,7 +42,7 @@
 [model.input.lowres]
     bars = ["volume", "close", "open", "high", "low"]
     indicators = ["atr10"]
-    sequence_length = 20
+    sequence_length = 30
     scaler = "StandardScaler"
 [model.input.daily]
     dailyBars = ["close", "vwap", "open"]
@@ -50,7 +50,7 @@
     scaler = "StandardScaler"
 
 [model.architecture]
-    name = "LSTM3Inputs_"  #modelLSTM_ LSTM2Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
+    name = "LSTM3InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
 [model.architecture.params.early_stopping]

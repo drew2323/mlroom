@@ -9,11 +9,6 @@ from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential, Model
 import keras.layers as layers
 from keras.optimizers import Adam
-#TODO jak ulozit architecturu a mit jit
-# import tensorflow as tf
-# gpu_devices = tf.config.experimental.list_physical_devices("GPU")
-# for device in gpu_devices:
-#     tf.config.experimental.set_memory_growth(device, True)
 
 def LSTM3Inputs_(input_shape, **params):
 
