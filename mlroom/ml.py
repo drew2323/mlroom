@@ -14,7 +14,7 @@ from copy import deepcopy
 from mlroom.utils import ext_services as exts
 import mlroom.arch as arch
 import requests
-from keras.callbacks import EarlyStopping
+import keras.callbacks as cb
 from keras.models import model_from_json
 import inspect
 import pickle
@@ -186,7 +186,7 @@ class ModelML:
 
         model_params = self.architecture.get("params", None)
         #early_stopping = self.model_params.get("architecture", {}).get("params", {}).get("early_stopping", None)
-        early_stopping = model_params.get("early_stopping", None)
+        callbacks = model_params.get("callbacks", None)
 
         print("MODEL: ", model_name)
         print("MODEL PARAMS:", model_params)
@@ -205,11 +205,14 @@ class ModelML:
         fit_params = {'epochs': self.train_epochs}
         if self.train_batch_size is not None:
             fit_params['batch_size'] = self.train_batch_size
-        if early_stopping is not None:
-            #support for early stoppage
-            early_stopping = EarlyStopping(**early_stopping)
-            fit_params['callbacks'] = [early_stopping]
 
+        #INIT CALLBACKS from PARAMS
+        if callbacks is not None:
+            fit_params['callbacks'] = []
+            for callback_name, callback_params in callbacks.items():
+                CallbackClass = getattr(cb, callback_name)
+                fit_params['callbacks'].append(CallbackClass(**callback_params))
+                
         #TODO to presunout do initu, kdyz se oscedci a prejmenovat na validation_split
         if "test_size" in self.cfg["validation"]:
             if self.cfg["validation"]["test_size"] != 0:

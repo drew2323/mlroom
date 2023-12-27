@@ -6,18 +6,18 @@
     #test 5.161.179.223
     upload_server = "5.161.179.223" #where to upload model
     download_server = "5.161.179.223" #to download batches/runners
-    upload = true
+    upload = false
 [validation]
-    test_size = 0.1 #validujeme na casti testovacich dat
+    test_size = 0.05 #validujeme na casti testovacich dat
     runners = ["fde1d7ac-d0e5-4473-b366-657807b7690c"] #nad seznamem runner
     batch = "" #nad konkretnim batchem
 [model]
     name = "LSTM"
-    version = 0.2
+    version = 0.23
     note = "LSTM no att, just 3 inputs, added l2 regularization"
     #train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
     train_batch_id = "1ca02a05"
-    train_epochs = 35
+    train_epochs = 60
     train_remove_cross_sequences = true #nyni nefunguje, je true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
@@ -54,12 +54,19 @@
 [model.architecture.params]
     learning_rate = 0.001
     l2_reg = 0.001 # Added L2 regularization parameter
-[model.architecture.params.early_stopping]
+[model.architecture.params.callbacks.EarlyStopping]
     #monitor='mean_squared_error'
     monitor='loss'
     patience=20
     min_delta=0.0001
     mode='min'
+[model.architecture.params.callbacks.ReduceLROnPlateau] #reduces lr
+    #monitor='mean_squared_error'
+    monitor='val_loss'
+    factor=0.1 #snizi learning rate o 10% kdyz se po 5 epoch nesnizi val_loss
+    patience=5
+    min_lr=0.00001
+    verbose=1
 
 #novy format?
 # [train.sources]
