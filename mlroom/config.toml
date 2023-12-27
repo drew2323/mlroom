@@ -13,11 +13,11 @@
     batch = "" #nad konkretnim batchem
 [model]
     name = "LSTM"
-    version = 0.1
-    note = "LSTM no att, just 3 inputs"
+    version = 0.2
+    note = "LSTM no att, just 3 inputs, added l2 regularization"
     #train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
     train_batch_id = "1ca02a05"
-    train_epochs = 20
+    train_epochs = 35
     train_remove_cross_sequences = true #nyni nefunguje, je true
     train_batch_size = 64
     #sem pridat batch_id a take earlystoppage params
@@ -53,6 +53,7 @@
     name = "LSTM3Inputs_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params]
     learning_rate = 0.001
+    l2_reg = 0.001 # Added L2 regularization parameter
 [model.architecture.params.early_stopping]
     #monitor='mean_squared_error'
     monitor='loss'

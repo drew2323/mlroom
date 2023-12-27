@@ -165,8 +165,8 @@ def train():
 
     #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
     #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
-    print(f"{X_train}")
-    print(f"{y_train}")
+    #print(f"{X_train}")
+    #print(f"{y_train}")
 
     X_train = list(X_train.values())
 
