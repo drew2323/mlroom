@@ -991,7 +991,7 @@ class ModelML:
             print("Day:", idx+1)
             for key in self.distinct_sources: 
                 klice = sources[idx][key].keys() 
-                first_key_idx = list(klice)[idx]
+                first_key_idx = list(klice)[0]
                 first_key_len = len(sources[idx][key][first_key_idx])     
                 print(f"{key} contains: {len(sources[idx][key])} with length: {first_key_len}")
 
