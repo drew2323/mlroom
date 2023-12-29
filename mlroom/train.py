@@ -140,30 +140,18 @@ def main():
     train()
 
 def train():
-    #if null,the validation is made on 10% of train data
-    #runnery pro testovani
     validation_runners = CONFIG["validation"]["runners"]
-
-    #u binary bude target bud hotovy indikator a nebo jej vytvorit on the fly
-    #mozna sem dal pluginovy eval load model architektury 
-    #CHTELO BY TO SEM i ulozit nastaveni architektury se kterou se testuje
+    validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
+    np.set_printoptions(threshold=10,edgeitems=5)
 
     model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
     
-    #Loads training data (only distinctive_sources required by inputs)
-    source_data = model_instance.load_data()
-    np.set_printoptions(threshold=10,edgeitems=5)
-
+    #Loads training data (by distinct_sources)
+    source_data = model_instance.load_data() #per day as list
     concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
-
-    #NOTE - podporit pripad, kdy TARGET je v rozliseni, ktere nemame v inputech
-    # napr. target mam v bars, ale dodavam jenom cbar_indicators
-    # resampluje, ale initial data jsou filtrovane na distinct_sources
     X_train, y_train = model_instance.scale_and_sequence(concatenated, day_indexes)
 
-    #TODO scaling idealne po zakladni transformaci a pred sequencingem
-
-    #TODO zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
+    #zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
     #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
     #print(f"{X_train}")
     #print(f"{y_train}")
@@ -180,40 +168,34 @@ def train():
   
     source_data = None
 
-    test_size = None
-    if "test_size" in CONFIG["validation"]:
-        if CONFIG["validation"]["test_size"] != 0:
-            test_size = float(CONFIG["validation"]["test_size"])
+    test_size = float(CONFIG["validation"].get("test_size",0))
 
-    # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
     #nechame si takhle rozdelit i referencni sloupec
     y_train_ref = np.array([], dtype=np.float64)
 
-    #y_train_ref nyni pryc
-    #X_splitted = train_test_split(*X_train, y_train, y_train_ref, test_size=test_size, shuffle=False) #random_state=42)
-    *X_train, y_train, y_test = train_test_split(*X_train, y_train, test_size=test_size, shuffle=False) #random_state=42)
+    #SPLITTING not REQUIRED
+    if test_size > 0:
+        # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
+        *X_train, y_train, y_test = train_test_split(*X_train, y_train, test_size=test_size, shuffle=False) #random_state=42)
 
-    #X_train je multiinput - nyni obsahuje i train(v sudych) i test(lichych) - rozdelim
-    X_test = [element for index, element in enumerate(X_train) if index % 2 != 0]
-    X_train = [element for index, element in enumerate(X_train) if index % 2 == 0]
+        #X_train je multiinput - nyni obsahuje i train(v sudych) i test(lichych) - rozdelim
+        X_test = [element for index, element in enumerate(X_train) if index % 2 != 0]
+        X_train = [element for index, element in enumerate(X_train) if index % 2 == 0]
 
-    print("Splittig the data")
-
-    print("X_train")
-    for idx, x in enumerate(X_train):
-        print("input:",idx)
-        print(f"source:X_train[{idx}]", np.shape(x))
-
-    for idx, x in enumerate(X_test):
+        print("Splittig the data")
+        print("X_train")
+        for idx, x in enumerate(X_train):
             print("input:",idx)
-            print(f"source:X_test[{idx}]", np.shape(x))
+            print(f"source:X_train[{idx}]", np.shape(x))
 
-    print("y_train", np.shape(y_train))
-    print("y_test", np.shape(y_test))
-    # print("y_test_ref", np.shape(y_test_ref))
-    # print("y_train_ref", np.shape(y_train_ref))
+        for idx, x in enumerate(X_test):
+                print("input:",idx)
+                print(f"source:X_test[{idx}]", np.shape(x))
 
-    #print(np.shape(X_train))
+        print("y_train", np.shape(y_train))
+        print("y_test", np.shape(y_test))
+
+
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
     model_instance.train_and_store(X_train, y_train)
 
@@ -223,11 +205,10 @@ def train():
     print("STARTING VALIDATION - SCALAR")
     #TBD db layer
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
-
     # region Live predict
-    if len(validation_runners) > 0:
+    if len(validation_runners) > 0 or validation_batch is not None:
         #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
-        sources = model_instance.load_runners_as_list(runner_id_list=validation_runners)
+        sources = model_instance.load_runners_as_list(runner_id_list=validation_runners, batch_id=validation_batch)
         #zmergujeme vsechny data dohromady 
         model_instance.validate_available_features(sources)
 
@@ -243,17 +224,16 @@ def train():
         state = State()   
         value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
-        # endregion
         end_time = time.time()  # End timing
         print(f"Time taken for this iteration: {end_time - start_time} seconds")
-
+    # endregion
 
     print("STARTING EVALUATION - VECTOR BASED")
     #EVALUATE TEST DATA - VECTOR BASED
     #TODO toto predelat na evaluate()
     #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
-    validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
-    if len(validation_runners) > 0 or validation_batch is not None:
+
+    if test_size==0 and (len(validation_runners) > 0 or validation_batch is not None):
         print(f"Loading validations {validation_runners=} {validation_batch=}")
         source_data = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
         concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
@@ -262,11 +242,7 @@ def train():
         X_test = list(X_test.values())
     else:
         print("For validation part of testdata is used", test_size)
-    #prepnout ZDE pokud testovat cely bundle - jinak testujeme jen neznama
-    #X_test = X_complete
-    #y_test = Y_complete
 
-    #toto zmenit na keras 3.0 EVALUATE
     result = model_instance.model.evaluate(X_test, y_test)
     print(result)
 
@@ -292,26 +268,6 @@ def train():
 
     average_time = total_time / len(X_test[0])
     print(f"Average time per iteration: {average_time} seconds")
-
-    # X_test = model_instance.model.predict(X_test)
-    # X_test = model_instance.scalerY.inverse_transform(X_test)
-
-    # #target testovacim dat proc tu je reshape?
-    # #y_test.reshape(-1, 1)
-    # y_test =  model_instance.scalerY.inverse_transform(y_test.reshape(-1, 1))
-    # #celkovy mean? nebo spis vector pro graf?
-    # mse = mean_squared_error(y_test, X_test)
-    # print('Test MSE:', mse)
-
-    # # Plot the predicted vs. actual
-    # plt.plot(y_test, label='Actual')
-    # plt.plot(X_test, label='Predicted')
-    # #TODO zde nejak vymyslet jinou pricelinu - jako lightweight chart
-    # #plt.plot(y_test_ref, label='reference column - price')
-    # plt.plot()
-    # plt.legend()
-    # plt.savefig("res_pred_act.png")
-    # #plt.show()
 
 
 if __name__ == "__main__":

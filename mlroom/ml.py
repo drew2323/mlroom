@@ -61,19 +61,15 @@ class ModelML:
     def __init__(self, name: str,
                 input: dict,
                 target: dict,
-                train_epochs: int, #train
-                train_target_steps: int = 0, #train
-                train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train
+                train_target_steps: int = 0, #train not used
+                train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train not used
                 train_runner_ids: list = None, #train
                 train_batch_id: str = None, #train
-                train_batch_size: int = 32,
                 version: str = "1",
                 note : str = None,
                 train_remove_cross_sequences: bool = False, #train
-                pred_output: PredOutput = PredOutput.LINEAR,
-                #architecture settings from TOML file
-                architecture: dict = None,
-                # model: Sequential = Sequential(),
+                pred_output: PredOutput = PredOutput.LINEAR, #not used
+                architecture: dict = None, #architecture settings from TOML file
                 cfg: dict = None, #whole self.cfguration
                 cfg_toml: str = None #whole configuration in unparsed toml for later use
                 )-> None:
@@ -149,10 +145,8 @@ class ModelML:
             raise Exception("train_runner_ids nebo train_batch_id musi byt vyplnene")
         self.train_runner_ids = train_runner_ids
         self.train_batch_id = train_batch_id
-        self.train_batch_size = train_batch_size
         self.train_target_steps = train_target_steps
         self.train_target_transformation = train_target_transformation
-        self.train_epochs = train_epochs
         #keep cross sequences between runners
         self.train_remove_cross_sequences = train_remove_cross_sequences
         self.custom_layers = {}
@@ -184,9 +178,7 @@ class ModelML:
             print(f"Number of inputs doesnt match model requirements len(X_train){len(X_train)} vs model input cfg {model_inputs}")
             return
 
-        model_params = self.architecture.get("params", None)
-        #early_stopping = self.model_params.get("architecture", {}).get("params", {}).get("early_stopping", None)
-        callbacks = model_params.get("callbacks", None)
+        model_params = self.architecture.get("params", {})
 
         print("MODEL: ", model_name)
         print("MODEL PARAMS:", model_params)
@@ -198,26 +190,21 @@ class ModelML:
         #print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
 
         # **model_params
-        self.model, self.custom_layers = arch_function(input_shape)
+        self.model, self.custom_layers = arch_function(input_shape, **model_params)
         print("COMPILED MODEL LOADED")
 
-        #create input params if provided
-        fit_params = {'epochs': self.train_epochs}
-        if self.train_batch_size is not None:
-            fit_params['batch_size'] = self.train_batch_size
+        #FIT PARAMS (key callback is processed)
+        # we use all excepts callbacks
+        fit_cfg = self.cfg["fit"]
+        fit_params = {k: v for k, v in fit_cfg.items() if k != "callbacks"}
 
         #INIT CALLBACKS from PARAMS
-        if callbacks is not None:
+        if fit_cfg.get("callbacks", False):
             fit_params['callbacks'] = []
-            for callback_name, callback_params in callbacks.items():
+            for callback_name, callback_params in fit_cfg["callbacks"].items():
                 CallbackClass = getattr(cb, callback_name)
                 fit_params['callbacks'].append(CallbackClass(**callback_params))
                 
-        #TODO to presunout do initu, kdyz se oscedci a prejmenovat na validation_split
-        if "test_size" in self.cfg["validation"]:
-            if self.cfg["validation"]["test_size"] != 0:
-                fit_params["validation_split"] = float(self.cfg["validation"]["test_size"])
-
         res_object=self.model.fit(X_train,y_train, **fit_params)
         self.metadata["history"] = res_object.history
 
@@ -314,9 +301,9 @@ class ModelML:
                     # input_feature = np.column_stack([sources[source_key][feature][-sequence_length:] for feature in  sources[source_key] if feature in features]) 
                     # Optimized list comprehension with padding, if there is not enough data 
                     input_feature = np.column_stack([
-                        np.pad(sources[feature][-sequence_length:], 
+                        np.pad(np.array(sources[feature][-sequence_length:]).astype(float), 
                             (max(0, sequence_length - len(sources[feature][-sequence_length:])), 0), 
-                            mode='constant') 
+                            mode='constant', constant_values=np.nan)
                         for feature in features
                     ])
                     features_to_join.append(input_feature)
@@ -324,6 +311,8 @@ class ModelML:
             #join features with the same time, scale it and add to input list
             joined_features = np.concatenate(features_to_join, axis=1)
             joined_features = self.scalersX[input_item].transform(joined_features)
+            #as padding is done with NaNs, change it to 0 for the model
+            joined_features = np.nan_to_num(joined_features)
             #reshape to 3d batch_size(1), sequence_length, feature   ()
             #TODO optimalizovat na speed
             joined_features = joined_features.reshape((1, joined_features.shape[0], joined_features.shape[1]))
@@ -790,7 +779,7 @@ class ModelML:
                     else:
                         start_idx = max(0, aligned_indices[i] - sequence_length + 1)
                         sequence = [feature[start_idx:aligned_indices[i]+1] for feature in spliced_features]
-                        sequence = [np.pad(seq, (max(0, sequence_length - len(seq)), 0), mode='constant') for seq in sequence]
+                        sequence = [np.pad(seq, (max(0, sequence_length - len(seq)), 0), mode='constant', constant_values=0) for seq in sequence]
                         sequence = np.stack(sequence, axis=-1)
 
                     sequences.append(sequence)

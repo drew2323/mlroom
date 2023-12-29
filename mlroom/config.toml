@@ -1,72 +1,66 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    #download_server = "0.0.0.0"
-    #upload_server = "0.0.0.0"
-
-    #test 5.161.179.223
-    upload_server = "5.161.179.223" #where to upload model
-    download_server = "5.161.179.223" #to download batches/runners
+    download_server = "0.0.0.0"
+    upload_server = "0.0.0.0"
+    #upload_server = "5.161.179.223" #where to upload model
+    #download_server = "5.161.179.223" #to download batches/runners
     upload = true
-[validation]
-    test_size = 0 #validujeme na casti testovacich dat
-    runners = ["a44fc00d-bebf-49ba-b187-a7b0cc2f0557"] #nad seznamem runner
+[validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
+    test_size = 0 #zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
+    runners = ["a37fe8ba-bb87-410d-ba1a-fe46c7b93903"] #runners or batch as sources
     batch = "" #nad konkretnim batchem
-[model]
-    name = "Conv1DLSTM"
-    version = 0.3
-    note = "Conv bar LSTM 2 inputs a Att - toto i na cbary zkusit"
-    #train_runner_ids = ["4a4757b2-1cb5-41a1-a950-190aa6a0a196"]
-    train_batch_id = "5ea09700"
-    train_epochs = 25
-    train_remove_cross_sequences = true #nyni nefunguje, je true
-    train_batch_size = 64
-    #sem pridat batch_id a take earlystoppage params
 
-#state.bars, state.indicators, state.cbar_idnicators, state.dailyBars, state.static_inds
-#each input groups the same granularity
-#first is always highest with target, now - in the future can be in the lowest and is distributed to high-res
+[fit] #params that go to Model.fit
+    batch_size = 64
+    epochs = 3
+    validation_split = 0 #validace po kazde epoch (ubira z testovacich dat
+    verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
 
-#TODO pozor na poradi v predictu musi odpovidat
-
-#this is the target that will be used for label
-#we support target resampling, if used on other than highest resolution
-[model.target] 
-    indicators = "target3"
-    target_reference = "tick_price"
-    scaler = "StandardScaler"
-
-# [model.input.highres]
-#     cbar_indicators = ["tick_price", "tick_volume","tick_trades"] #"market_time"
-#     sequence_length = 75
-#     scaler = "StandardScaler"
-[model.input.lowres]
-    bars = ["vwap","close","open","high","low"]
-    indicators = ["daytimebar", "divema", "slope5", "voldiv"]
-    sequence_length = 100
-    scaler = "StandardScaler"
-[model.input.daily]
-    dailyBars = ["rsi", "volume_sma_divergence", "open", "close"]
-    sequence_length = 25
-    scaler = "StandardScaler"
-
-[model.architecture]
-    name = "Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
-[model.architecture.params]
-    learning_rate = 0.001
-    l2_reg = 0.001 # Added L2 regularization parameter
-[model.architecture.params.callbacks.EarlyStopping]
-    #monitor='mean_squared_error'
-    monitor='loss'
+[fit.callbacks.EarlyStopping]
+    monitor='loss' #'mean_squared_error'
     patience=20
     min_delta=0.0001
     mode='min'
-# [model.architecture.params.callbacks.ReduceLROnPlateau] #reduces lr
+# [fit.callbacks.ReduceLROnPlateau] #reduces lr
 #     #monitor='mean_squared_error'
 #     monitor='val_loss'
 #     factor=0.1 #snizi learning rate o 10% kdyz se po 5 epoch nesnizi val_loss
 #     patience=5
 #     min_lr=0.00001
 #     verbose=1
+
+[model]
+    name = "Conv1DLSTMAtt" #name that would be used to predict
+    version = 0.4
+    note = "Conv bar LSTM 2 inputs a Att - novy labeling div th = 0.0008"
+    train_runner_ids = ["a37fe8ba-bb87-410d-ba1a-fe46c7b93903"]
+    #train_batch_id = "5ea09700"
+    train_remove_cross_sequences = true #nyni nefunguje, je true
+
+#this is the target that will be used for label
+#we support target resampling, if used on other than highest resolution
+[model.target] #target used for labeling, we support target resampling, if used on other than highest resolution
+    indicators = "targetema"
+    target_reference = "tick_price"
+    scaler = "StandardScaler"
+[model.input.highres]
+    cbar_indicators = ["tick_price", "tick_volume","tick_trades", "daytimetick"]
+    sequence_length = 300
+    scaler = "StandardScaler"
+[model.input.lowres]
+    bars = ["vwap","close","open","high","low"]
+    indicators = ["daytimebar", "divema", "slope5", "voldiv", "rsi14MA", "emaSlow"]
+    sequence_length = 200
+    scaler = "StandardScaler"
+# [model.input.daily]
+#     dailyBars = ["rsi", "volume_sma_divergence", "open", "close"]
+#     sequence_length = 25
+#     scaler = "StandardScaler"
+[model.architecture]
+    name = "Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
+[model.architecture.params] #params that are passed into model function (needed to compile)
+    learning_rate = 0.001
+#    l2_reg = 0.001 # Added L2 regularization parameter
 
 #novy format?
 # [train.sources]
