@@ -1,13 +1,13 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    download_server = "0.0.0.0"
-    upload_server = "0.0.0.0"
-    #upload_server = "5.161.179.223" #where to upload model
-    #download_server = "5.161.179.223" #to download batches/runners
+    #download_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
+    upload_server = "5.161.179.223" #where to upload model
+    download_server = "5.161.179.223" #to download batches/runners
     upload = true
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
     test_size = 0 #zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
-    runners = ["a37fe8ba-bb87-410d-ba1a-fe46c7b93903"] #runners or batch as sources
+    runners = ["cb10b2c1-68bd-49e6-b317-c1529c3ce43a"] #runners or batch as sources
     batch = "" #nad konkretnim batchem
 
 [fit] #params that go to Model.fit
@@ -30,11 +30,11 @@
 #     verbose=1
 
 [model]
-    name = "Conv1DLSTMAtt" #name that would be used to predict
-    version = 0.4
-    note = "Conv bar LSTM 2 inputs a Att - novy labeling div th = 0.0008"
-    train_runner_ids = ["a37fe8ba-bb87-410d-ba1a-fe46c7b93903"]
-    #train_batch_id = "5ea09700"
+    name = "Conv1DLSTMAtt6D" #name that would be used to predict
+    version = 0.1
+    note = "Conv bar LSTM 2 inputs a Att - novy labeling div th = 0.0008, na 6dnech"
+    #train_runner_ids = ["a37fe8ba-bb87-410d-ba1a-fe46c7b93903"]
+    train_batch_id = "0c44fad9"
     train_remove_cross_sequences = true #nyni nefunguje, je true
 
 #this is the target that will be used for label

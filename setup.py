@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mlroom',
-    version='0.403',
+    version='0.423',
     packages=find_packages(),
     include_package_data=True,
     package_data={
