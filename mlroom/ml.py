@@ -1,3 +1,5 @@
+import os
+os.environ["KERAS_BACKEND"] = "jax"
 import matplotlib.pyplot as plt
 #from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing

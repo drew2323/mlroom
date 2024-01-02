@@ -1,4 +1,6 @@
 import numpy as np
+import os
+os.environ["KERAS_BACKEND"] = "jax"
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
