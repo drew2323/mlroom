@@ -224,6 +224,12 @@ def train():
         state = State()   
         value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
+        print("Shape of predictions", value.shape)
+        if value.shape == (1,):
+            print("Value:",float(value))
+        else:
+            print("predicted max", np.argmax(value, axis=1))
+
         end_time = time.time()  # End timing
         print(f"Time taken for this iteration: {end_time - start_time} seconds")
     # endregion
@@ -259,7 +265,8 @@ def train():
         # Feed the reshaped sample to your LSTM model
         prediction = model_instance.model.predict_on_batch(one_sample)
         #prediction = model_instance.model(one_sample, training=False)
-        prediction = model_instance.scalerY.inverse_transform(prediction)
+        if model_instance.scalerY is not None:
+            prediction = model_instance.scalerY.inverse_transform(prediction)
         end_time = time.time()  # End timing
         #print("val:", prediction)
         #print(f"IT time: {end_time - start_time} seconds")

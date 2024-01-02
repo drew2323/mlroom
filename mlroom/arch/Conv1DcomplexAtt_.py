@@ -50,10 +50,8 @@ def Conv1DcomplexAtt_(input_shape, **params):
     model.add(MaxPooling1D(pool_size=2))
     model.add(Conv1D(filters=256, kernel_size=3, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
-
     # Self-Attention Layer
     model.add(SelfAttention())
-
     # Flatten Layer
     model.add(Flatten())
 

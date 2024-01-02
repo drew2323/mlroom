@@ -64,7 +64,7 @@ def Conv1DLSTM2InputsMHAtt_(input_shape, **params):
 
     # Main input and its layers
     main_input = Input(shape=input_shape[0], name='main_input')
-    x1 = Conv1D(filters=64, kernel_size=3, activation='relu')(main_input)
+    x1 = Conv1D(filters=64, kernel_size=5, activation='relu')(main_input)
     x1 = MaxPooling1D(pool_size=2)(x1)
     x1 = BatchNormalization()(x1)
     x1 = LSTM(50, return_sequences=True)(x1)

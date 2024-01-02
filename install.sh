@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Creating a swap file
-sudo fallocate -l 4GB /swapfile
+sudo fallocate -l 15GB /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile

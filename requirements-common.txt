@@ -21,6 +21,7 @@ idna==3.6
 joblib==1.3.2
 keras>=3.0
 keras-tcn @ git+https://github.com/drew2323/keras-tcn.git
+keras_nlp
 kiwisolver==1.4.5
 libclang==16.0.6
 Markdown==3.5.1

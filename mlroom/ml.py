@@ -15,13 +15,14 @@ from mlroom.utils import ext_services as exts
 import mlroom.arch as arch
 import requests
 import keras.callbacks as cb
-from keras.models import model_from_json
+from keras.models import model_from_json, load_model
 import inspect
 import pickle
 import pandas as pd
 from collections import defaultdict
 from tqdm import tqdm
 import time
+from traceback import format_exc
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
 
@@ -126,8 +127,10 @@ class ModelML:
         #         break
         
         #INIT scalerY (scaler from target settings)
-        ScalerClass = getattr(preprocessing, target.get("scaler", "StandardScaler"))
-        self.scalerY = ScalerClass()
+        self.scalerY = None
+        if target.get("scaler", False):
+            ScalerClass = getattr(preprocessing, target.get("scaler", "StandardScaler"))
+            self.scalerY = ScalerClass()
 
         #Extract all features grouped by distinc_sources (ie. bars = time, close cbars_indicators = time, close -..)
         #needed for features validation
@@ -204,9 +207,26 @@ class ModelML:
             for callback_name, callback_params in fit_cfg["callbacks"].items():
                 CallbackClass = getattr(cb, callback_name)
                 fit_params['callbacks'].append(CallbackClass(**callback_params))
-                
+
+
+        #TODO pridat validate during fit - externi runnery pro validace
+
         res_object=self.model.fit(X_train,y_train, **fit_params)
         self.metadata["history"] = res_object.history
+
+        if self.cfg.get("save_best", False):
+            try:
+                filepath = fit_cfg["callbacks"]["ModelCheckpoint"]["filepath"]
+                #monitored metrics and its best value and epoch
+                metric = fit_cfg["callbacks"]["ModelCheckpoint"]["monitor"]
+                monitor_dict = self.metadata["history"][metric]
+                best_epoch = monitor_dict.index(min(monitor_dict)) + 1 
+                best_value = min(monitor_dict)
+                self.metadata["history"]["saved_best"] = {"epoch": best_epoch, metric: best_value}
+                self.model = load_model(filepath)
+                print(f"CHECKPOINTED MODEL USED [{metric}]: {best_value} epoch: {best_epoch}")
+            except Exception as e:
+                print("ERROR in CHECKPOINT"+ str(e)+ format_exc())
 
         mu.send_to_telegram("TRAINING FINISHED")
 
@@ -822,16 +842,17 @@ class ModelML:
         y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
         
         print("Scaling y_train")
-        if fit_scalers is True:
-            y_train = self.scalerY.fit_transform(y_train)
-        else:
-            y_train = self.scalerY.transform(y_train)
+        if self.scalerY is not None:
+            if fit_scalers is True:
+                y_train = self.scalerY.fit_transform(y_train)
+            else:
+                y_train = self.scalerY.transform(y_train)
 
-        scaler = self.scalerY
-        print("scaler vidi")
-        print("pocet featur:", scaler.n_features_in_)
-        #print(scaler.feature_names_in_)
-        print("pocet samplu:", scaler.n_samples_seen_)
+            scaler = self.scalerY
+            print("scaler vidi")
+            print("pocet featur:", scaler.n_features_in_)
+            #print(scaler.feature_names_in_)
+            print("pocet samplu:", scaler.n_samples_seen_)
 
         return X_train, y_train
 
@@ -1049,10 +1070,11 @@ class ModelML:
         #TODO porovnat performance s predict_on_batch
         #start_time = time.time() 
         prediction = self.model.predict_on_batch(transf_input)
-        prediction = self.scalerY.inverse_transform(prediction)
+        if self.scalerY is not None:
+            prediction = self.scalerY.inverse_transform(prediction)
         #end_time = time.time() 
         #print(f"TIME: {end_time-start_time}s")
-        return float(prediction)
+        return prediction
 
     def plot_target(self, y_train,y_train_ref):   #zobrazime si transformovany target a jeho referncni sloupec
         #ZHOMOGENIZOVAT OSY
