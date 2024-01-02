@@ -1,11 +1,11 @@
     #download_server = "142.132.188.109"
     #upload_server = "142.132.188.109"
-    download_server = "0.0.0.0"
-    upload_server = "0.0.0.0"
-    #upload_server = "5.161.179.223" #where to upload model
-    #download_server = "5.161.179.223" #to download batches/runners
+    #download_server = "0.0.0.0"
+    #upload_server = "0.0.0.0"
+    upload_server = "5.161.179.223" #where to upload model
+    download_server = "5.161.179.223" #to download batches/runners
     upload = true
-    save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
+    save_best = false #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
 #tato sekce bude pridana
 # [train]
@@ -16,31 +16,31 @@
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
     test_size = 0 #zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
-    runners = ["97c89a2e-7f59-42a5-9842-89465421b453"] #runners or batch as sources
+    runners = ["f4a5e59e-2048-479b-a5d8-1e7b14e3e12e"] #runners or batch as sources
     batch = "" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
     #send_val_data_to_fit
 
 [fit] #params that go to Model.fit
     batch_size = 64
-    epochs = 1
-    validation_split = 0.2 #validace po kazde z epoch (ubira z testovacich dat
+    epochs = 4
+    validation_split = 0.1 #validace po kazde z epoch (ubira z testovacich dat
     verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
 #TODO eval val_loss mechanism
 
 # ModelCheckpoint to save the model with the lowest validation loss
-[fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
-    filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
-    monitor='val_loss'
-    mode='min' #max
-    save_best_only=true #best or each epoch
-    verbose=1
+# [fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
+#     filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
+#     monitor='val_loss'
+#     mode='min' #max
+#     save_best_only=true #save best or save each epoch
+#     verbose=1
 
-[fit.callbacks.EarlyStopping]
-    monitor='val_loss' #'mean_squared_error' #val_loss
-    patience=20
-    min_delta=0.001
-    mode='min'
+# [fit.callbacks.EarlyStopping]
+#     monitor='val_loss' #'mean_squared_error' #val_loss
+#     patience=20
+#     min_delta=0.001
+#     mode='min'
 # [fit.callbacks.ReduceLROnPlateau] #reduces lr
 #     #monitor='mean_squared_error'
 #     monitor='val_loss'
@@ -58,7 +58,7 @@
     name = "TransD" #name that would be used to predict
     version = 0.1
     note = "Test transformer s categorical entropy, 0,1,2 labeling and log_returns"
-    train_runner_ids = ["97c89a2e-7f59-42a5-9842-89465421b453"]
+    train_runner_ids = ["f4a5e59e-2048-479b-a5d8-1e7b14e3e12e"]
     #train_batch_id = "b110ccd6"
     train_remove_cross_sequences = true #nyni nefunguje, je true
 
@@ -67,7 +67,7 @@
 [model.target] #target used for labeling, we support target resampling, if used on other than highest resolution
     indicators = "targetema"
     target_reference = "tick_price"
-    #scaler = "StandardScaler" #pokud zakomentovano, nescalujeme
+    #scaler = "MinMaxScaler" #pokud zakomentovano, nescalujeme
 [model.input.highres]
     cbar_indicators = ["tick_volume","tick_trades", "daytimetick", "tick_price_log_return"] #"tick_price", 
     sequence_length = 300

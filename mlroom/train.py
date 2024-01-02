@@ -225,7 +225,7 @@ def train():
         value = model_instance.predict(state)
         print("prediction for LIVE SIM:", value)
         print("Shape of predictions", value.shape)
-        if value.shape == (1,):
+        if value.shape == (1,1):
             print("Value:",float(value))
         else:
             print("predicted max", np.argmax(value, axis=1))
@@ -267,6 +267,7 @@ def train():
         #prediction = model_instance.model(one_sample, training=False)
         if model_instance.scalerY is not None:
             prediction = model_instance.scalerY.inverse_transform(prediction)
+        print(prediction)
         end_time = time.time()  # End timing
         #print("val:", prediction)
         #print(f"IT time: {end_time - start_time} seconds")
