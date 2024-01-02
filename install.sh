@@ -15,6 +15,7 @@ pip install tqdm
 #temporarily
 pip install —U keras-nlp
 pip install —U keras
+#pip install —upgrade keras-nlp-nightly
 
 # Navigate to the mlroom directory
 cd src/mlroom/mlroom
