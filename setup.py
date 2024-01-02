@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mlroom',
-    version='0.424',
+    version='0.425',
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -11,7 +11,6 @@ setup(
     },
     install_requires=[
         'keras>=3.0',  # Specify minimum version requirement
-        'keras_nlp',
         'scikit-learn==1.3.2',  # Specify minimum version requirement
         'appdirs',
         'alpaca-py',
