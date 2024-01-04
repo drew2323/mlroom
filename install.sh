@@ -21,7 +21,7 @@ pip install —U keras
 cd src/mlroom/mlroom
 
 curl -X 'GET'   'http://5.161.179.223:8000/threads/'   -H 'accept: application/json'   -H 'X-API-Key: david' -v
-sudo fallocate -l 10GB /swapfile
+sudo fallocate -l 16GB /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
@@ -32,7 +32,7 @@ pip install tqdm
 
 #pip install —U keras-nlp
 
-pip install —upgrade keras-nlp-nightly
+pip install —-upgrade keras-nlp-nightly
 pip install —U keras
 
 # Navigate to the mlroom directory

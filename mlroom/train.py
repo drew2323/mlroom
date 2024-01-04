@@ -11,7 +11,7 @@ from keras.callbacks import EarlyStopping
 #atplotlib.use('TkAgg')  # Use an interactive backend like 'TkAgg', 'Qt5Agg', etc.
 import matplotlib.pyplot as plt
 from mlroom.ml import ModelML
-from mlroom.utils.enums import PredOutput, Source, TargetTRFM
+from mlroom.utils.enums import PredOutput, Source, TargetTRFM, ScalingMode
 import mlroom.arch.architectures as ma
 from mlroom.config import CONFIG, CONFIG_STRING
 # from collections import defaultdict
@@ -139,17 +139,18 @@ import time
 def main():
     train()
 
-def train():
-    validation_runners = CONFIG["validation"]["runners"]
-    validation_batch = CONFIG["validation"]["batch"] if "batch" in CONFIG["validation"] else None
-    np.set_printoptions(threshold=10,edgeitems=5)
-
-    model_instance = ModelML(**CONFIG["model"], cfg=CONFIG, cfg_toml=CONFIG_STRING)
-    
-    #Loads training data (by distinct_sources)
-    source_data = model_instance.load_data() #per day as list
+#TODO vyzkouset jak se vysledek bude lisit pri pouzivani batchu a partial fitu
+#POZOR pri batchi je dulezite, aby kazda batch mela reprezentativní vzorek, zejména target, aby obsahoval vsechny hodnoty
+def train_batch(model_instance: ModelML, source_data: list, batch_number = 1, total_batches = 1):
     concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
-    X_train, y_train = model_instance.scale_and_sequence(concatenated, day_indexes)
+
+    #scaling mode (if 1 batch use fit_and_transofrm, if more batches - use partial)
+    if batch_number == 1 and total_batches == 1:
+        scaling = ScalingMode.FIT_AND_TRANSFORM
+    else:
+        scaling = ScalingMode.PARTIAL_FIT_AND_TRANSFORM
+
+    X_train, y_train = model_instance.scale_and_sequence(concatenated, day_indexes, scaling)
 
     #zatim pouzity stejny SCALER, v budoucnu vyzkouset vyuziti separatnich scalu pro kazde
     #rozliseni jak je naznaceno zde: https://chat.openai.com/c/2206ed8b-1c97-4970-946a-666dcefb77b4
@@ -173,7 +174,7 @@ def train():
     #nechame si takhle rozdelit i referencni sloupec
     y_train_ref = np.array([], dtype=np.float64)
 
-    #SPLITTING not REQUIRED
+    #SPLITTING TRAINING DATA - DECOMM - validacni data budou separatne
     if test_size > 0:
         # Split the data into training and test sets - kazdy vstupni pole rozdeli na dve
         *X_train, y_train, y_test = train_test_split(*X_train, y_train, test_size=test_size, shuffle=False) #random_state=42)
@@ -195,63 +196,56 @@ def train():
         print("y_train", np.shape(y_train))
         print("y_test", np.shape(y_test))
 
-
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
-    model_instance.train_and_store(X_train, y_train)
+    model_instance.train_and_store(X_train, y_train, batch_number, total_batches)
 
-    print("TRAINGING FINISHED")
+    print(f"Batch {batch_number}/{total_batches} TRAINGING FINISHED")
     #VALIDATION PART
 
-    print("STARTING VALIDATION - SCALAR")
-    #TBD db layer
+def train():
+    validation_runners = CONFIG.get("validation",{}).get("runners", None)
+    validation_batch = CONFIG.get("validation",{}).get("batch", None)
+
+    np.set_printoptions(threshold=10,edgeitems=5)
+
+    model_instance = ModelML(cfg=CONFIG, cfg_toml=CONFIG_STRING)
+    
+    #Loads training data (by distinct_sources)
+    source_data = model_instance.load_data() #per day as list
+    src_length = len(source_data) 
+    items_in_batch = model_instance.train_runners_per_batch
+    print("Runners per batch:",items_in_batch)
+    items_in_batch = src_length if items_in_batch is None or items_in_batch>src_length else items_in_batch
+    total_batches = -(-src_length // items_in_batch)  # Calculate the total number of batches
+
+    print("Number of days requested",src_length)
+    #print("Iterate to",items_in_batch)
+    for i in range(0, len(source_data), items_in_batch):
+        batch_number = i // items_in_batch + 1
+        print(f"Batch number {batch_number}/{total_batches}")
+        print(f"Items {i} to {i+items_in_batch}")
+        batch_source_data = source_data[i:i + items_in_batch]
+        # Process the batch here
+        train_batch(model_instance, batch_source_data, batch_number, total_batches)
+
+    print("STARTING VALIDATION")
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
-    # region Live predict
-    if len(validation_runners) > 0 or validation_batch is not None:
-        #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
-        sources = model_instance.load_runners_as_list(runner_id_list=validation_runners, batch_id=validation_batch)
-        #zmergujeme vsechny data dohromady 
-        model_instance.validate_available_features(sources)
+    if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
+        predict_live(model_instance, validation_runners, validation_batch)
 
-        #sources jako pole jednotlivych dnu
+        res  = model_instance.load_validation_data()
+        if res is not None:
+            X_test, y_test = res
+            vector_evaluation(model_instance, X_test, y_test)
+            measure_infer_speed(model_instance, X_test)
 
-        #pro skalar predict potrebujeme jen jako jednu?
 
-        #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
-        # Dynamically create a state class
-        start_time = time.time()  # Start timing
-        State = type('State', (object,), {**sources[0]})
-        # Create an instance of the dynamically created class
-        state = State()   
-        value = model_instance.predict(state)
-        print("prediction for LIVE SIM:", value)
-        print("Shape of predictions", value.shape)
-        if value.shape == (1,1):
-            print("Value:",float(value))
-        else:
-            print("predicted max", np.argmax(value, axis=1))
-
-        end_time = time.time()  # End timing
-        print(f"Time taken for this iteration: {end_time - start_time} seconds")
-    # endregion
-
+def vector_evaluation(model_instance, X_test, y_test):
     print("STARTING EVALUATION - VECTOR BASED")
-    #EVALUATE TEST DATA - VECTOR BASED
-    #TODO toto predelat na evaluate()
-    #pokud mame eval runners pouzijeme ty, jinak bereme cast z testovacich dat
-
-    if test_size==0 and (len(validation_runners) > 0 or validation_batch is not None):
-        print(f"Loading validations {validation_runners=} {validation_batch=}")
-        source_data = model_instance.load_data(runners_ids=validation_runners, batch_id=validation_batch)
-        concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
-        #fit scalers false
-        X_test, y_test = model_instance.scale_and_sequence(concatenated, day_indexes, False)
-        X_test = list(X_test.values())
-    else:
-        print("For validation part of testdata is used", test_size)
-
     result = model_instance.model.evaluate(X_test, y_test)
     print(result)
 
+def measure_infer_speed(model_instance, X_test):
     print("ITERATIONs - to measure INFER SPEED")
     total_time = 0
     for idx, val in enumerate(X_test[0]):
@@ -267,7 +261,7 @@ def train():
         #prediction = model_instance.model(one_sample, training=False)
         if model_instance.scalerY is not None:
             prediction = model_instance.scalerY.inverse_transform(prediction)
-        print(prediction)
+        #print(prediction)
         end_time = time.time()  # End timing
         #print("val:", prediction)
         #print(f"IT time: {end_time - start_time} seconds")
@@ -277,6 +271,29 @@ def train():
     average_time = total_time / len(X_test[0])
     print(f"Average time per iteration: {average_time} seconds")
 
+def predict_live(model_instance, validation_runners, validation_batch):
+    print("SCALAR PREDICTION -LIVE SIMULATION")
+    #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
+    sources = model_instance.load_runners_as_list(runner_id_list=validation_runners, batch_id=validation_batch)
+    #zmergujeme vsechny data dohromady 
+    model_instance.validate_available_features(sources)
+
+    #VSTUPEM JE dict(indicators=[],bars=[],cbar_indicators[], dailyBars=[]) - nebo jen state?
+    # Dynamically create a state class
+    start_time = time.time()  # Start timing
+    State = type('State', (object,), {**sources[0]})
+    # Create an instance of the dynamically created class
+    state = State()   
+    value = model_instance.predict(state)
+    print("prediction for LIVE SIM:", value)
+    print("Shape of predictions", value.shape)
+    if value.shape == (1,1):
+        print("Value:",float(value))
+    else:
+        print("predicted max", np.argmax(value, axis=1))
+
+    end_time = time.time()  # End timing
+    print(f"Time taken for this iteration: {end_time - start_time} seconds")
 
 if __name__ == "__main__":
     main()

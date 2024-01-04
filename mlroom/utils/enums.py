@@ -5,6 +5,13 @@ class Env(str, Enum):
     PROD = "prod"
     TEST = "test"
 
+from enum import Enum
+
+class ScalingMode(Enum):
+    FIT_AND_TRANSFORM = "fit_and_transform"
+    PARTIAL_FIT_AND_TRANSFORM = "partial_fit_and_transform"
+    ONLY_TRANSFORM = "only_transform"
+
 class TargetTRFM(str, Enum):
     #ponecha as is
     KEEPVAL = "keepval"

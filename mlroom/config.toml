@@ -4,29 +4,32 @@
     #upload_server = "0.0.0.0"
     upload_server = "5.161.179.223" #where to upload model
     download_server = "5.161.179.223" #to download batches/runners
-    upload = true
+    upload = true #nyni se uploaduje po kazdem batchi
     save_best = false #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
-#tato sekce bude pridana
-# [train]
-#     #train_runner_ids = ["7cf6fe32-7003-4179-8149-9236a906c733"]
-#     train_batch_id = "b110ccd6"
-#     train_remove_cross_sequences = true #nyni nefunguje, je true
-#     save_checkpointed = true
+[train]
+    #runners = ["fd29c97a-a141-4917-88de-078b045758c8"]
+    batch = "536c5570"
+    remove_cross_sequences = true #nyni nefunguje, je true
+    runners_per_batch = 999 #how many runners per batch
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
-    test_size = 0 #zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
-    runners = ["fd29c97a-a141-4917-88de-078b045758c8"] #runners or batch as sources
-    batch = "" #nad konkretnim batchem
+    #runners = ["fd29c97a-a141-4917-88de-078b045758c8"] #runners or batch as sources
+    batch = "53e04a2a" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
+    #test_size = 0 #DECOMM - zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
     #send_val_data_to_fit
 
 [fit] #params that go to Model.fit
     batch_size = 32
-    epochs = 5
-    validation_split = 0.2 #validace po kazde z epoch (ubira z testovacich dat
+    epochs = 4
+    validation_split = 0 #validace po kazde z epoch (ubira z testovacich dat
     verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
-#TODO eval val_loss mechanism
+
+    #these params are used only for validation_data
+    #validation_steps = 
+    #validation_batch_size =
+    #validation_freq =
 
 # ModelCheckpoint to save the model with the lowest validation loss
 # [fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
@@ -55,12 +58,9 @@
 
 [model]
      #vsechny ceny logreturn test
-    name = "TransD2inputs" #name that would be used to predict
+    name = "Trans2D" #name that would be used to predict
     version = 0.1
     note = "Test transformer s categorical entropy, 0,1,2 labeling and log_returns"
-    #train_runner_ids = ["fd29c97a-a141-4917-88de-078b045758c8"]
-    train_batch_id = "536c5570"
-    train_remove_cross_sequences = true #nyni nefunguje, je true
 
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
@@ -75,7 +75,7 @@
 [model.input.lowres]
     bars = ["trades","vwap","close","open","high","low"]
     indicators = ["daytimebar", "divema", "slope5", "voldiv", "rsi14MA", "emaSlow","vwap_log_return","close_log_return","open_log_return","high_log_return","low_log_return"]
-    sequence_length = 300
+    sequence_length = 100
     scaler = "StandardScaler"
 # [model.input.daily]
 #     dailyBars = ["rsi", "volume_sma_divergence", "open", "close"]
@@ -85,15 +85,10 @@
     name = "Transformer2Inputs_" #"Conv1D2Inputs_" #"Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params] #params that are passed into model function (needed to compile)
     learning_rate = 0.0001 #0.00005
-    trans_layers = [1,1] #number of transformer layers for each input
+    trans_layers = [2,2] #number of transformer layers for each input
 #    l2_reg = 0.001 # Added L2 regularization parameter
 
-#novy format?
-# [train.sources]
-#     #train_runner_ids = ["96fad44c-7a7a-4833-8915-6cc5180593a0"]
-#     train_batch_id = "b3346be9"
-# [train.sequencing]
-#     train_remove_cross_sequences = true
-# [train.params]
-#     epochs = 1
-#     batch_size = 32
+
+
+#TODO batches bude treba predelat
+#zejmena promyslet checkpointovani v ramci batchu

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 #from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
 from keras.models import Sequential
-from mlroom.utils.enums import PredOutput, Source, TargetTRFM
+from mlroom.utils.enums import PredOutput, Source, TargetTRFM, ScalingMode
 from mlroom.config import DATA_DIR, SOURCES_GRANULARITY
 import joblib
 from mlroom.utils import mlutils as mu
@@ -61,20 +61,12 @@ class ModelML:
     #     'CustomLayer1': CustomLayer1,
     #     'CustomLayer2': CustomLayer2
     # }
-    def __init__(self, name: str,
-                input: dict,
-                target: dict,
-                train_target_steps: int = 0, #train not used
-                train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train not used
-                train_runner_ids: list = None, #train
-                train_batch_id: str = None, #train
-                version: str = "1",
-                note : str = None,
-                train_remove_cross_sequences: bool = False, #train
-                pred_output: PredOutput = PredOutput.LINEAR, #not used
-                architecture: dict = None, #architecture settings from TOML file
-                cfg: dict = None, #whole self.cfguration
-                cfg_toml: str = None #whole configuration in unparsed toml for later use
+    def __init__(self,
+                cfg: dict = None, #whole parsed self.cfguration
+                cfg_toml: str = None, #whole configuration in unparsed toml for later use
+                pred_output: PredOutput = PredOutput.LINEAR, #not used DECOMM
+                train_target_steps: int = 0, #train not used DECOMM
+                train_target_transformation: TargetTRFM = TargetTRFM.KEEPVAL, #train not used DECOMM
                 )-> None:
 
         def sort_input_lists(input_dict):
@@ -84,21 +76,21 @@ class ModelML:
                 elif isinstance(value, list):
                     value.sort()
 
-        self.name = name
-        self.version = version
-        self.note  = note
+        self.name = cfg.get("model",{}).get("name", None)
+        self.version = cfg.get("model",{}).get("version", 0.1)
+        self.note  = cfg.get("model",{}).get("note", None)
+        self.architecture = cfg.get("model",{}).get("architecture", None)
+        self.input = cfg.get("model",{}).get("input", None)
+        self.target = cfg.get("model",{}).get("target", None)
+
         self.cfg = cfg
-        self.architecture = architecture
         #pro zpetne dohledani
-        self.metadata = dict(cfg=cfg, cfg_toml=cfg_toml)
+        self.metadata = dict(cfg=cfg, cfg_toml=cfg_toml, history={})
         self.pred_output: PredOutput = pred_output
         self.model = Sequential()
-        self.target = target
 
         #sortneme vsechny listy
-        sort_input_lists(input)
-
-        self.input = input
+        sort_input_lists(self.input)
 
         # Extracting distinct values of the sources and initi the scalers 
         # Initializing scalersX (now separate scaler for each input. Type of scaler defined here (standard/minMax)
@@ -121,17 +113,11 @@ class ModelML:
         target_area = list(self.target.keys())[0]
         if target_area not in self.distinct_sources:
             self.distinct_sources.add(target_area)
-
-        #bezpecnejsi verze, pripadne upravit strukturu cfg
-        # for key in self.target:
-        #     if key not in ["target_reference","scaler"] and key not in self.distinct_sources:
-        #         self.distinct_sources.add(key)
-        #         break
         
         #INIT scalerY (scaler from target settings)
         self.scalerY = None
-        if target.get("scaler", False):
-            ScalerClass = getattr(preprocessing, target.get("scaler", "StandardScaler"))
+        if self.target.get("scaler", False):
+            ScalerClass = getattr(preprocessing, self.target.get("scaler", "StandardScaler"))
             self.scalerY = ScalerClass()
 
         #Extract all features grouped by distinc_sources (ie. bars = time, close cbars_indicators = time, close -..)
@@ -146,11 +132,17 @@ class ModelML:
 
         self.highest_res_key = self.get_highest_resolution()
 
+        train_runner_ids = self.cfg.get("train",{}).get("runners", None)
+        train_batch_id = self.cfg.get("train",{}).get("batch", None)
+        train_remove_cross_sequences = self.cfg.get("train",{}).get("remove_cross_sequences", True)
+        train_runners_per_batch = self.cfg.get("train",{}).get("runners_per_batch", None)
+        
         if (train_runner_ids is None or len(train_runner_ids) == 0) and train_batch_id is None:
             raise Exception("train_runner_ids nebo train_batch_id musi byt vyplnene")
         self.train_runner_ids = train_runner_ids
         self.train_batch_id = train_batch_id
         self.train_target_steps = train_target_steps
+        self.train_runners_per_batch = train_runners_per_batch
         self.train_target_transformation = train_target_transformation
         #keep cross sequences between runners
         self.train_remove_cross_sequences = train_remove_cross_sequences
@@ -161,42 +153,61 @@ class ModelML:
     def initialize_model(architecture: dict):
         pass
 
-    #X_train bude list
-    def train(self, X_train, y_train):
     
-        #TODO upravit ostatni architectury, aby brali input shape jako list
-        #TODO zafixovat poradi - stejne i pri predictu
-        #input_shape is now list
-        #populate input_shape based on X_train (list of inputs)
-        input_shape = []
-        for idx, val in enumerate(X_train):
-            input_shape.append((val.shape[1], val.shape[2]))
+    def load_validation_data(self):
+        """Loads external validation data from runners or batch 
+            returns tuple (X,Y) or None
+        """
+        validation_runners = self.cfg.get("validation",{}).get("runners", None)
+        validation_batch = self.cfg.get("validation",{}).get("batch", None)
+        if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
+            print(f"Loading validations {validation_runners=} {validation_batch=}")
+            source_data = self.load_data(runners_ids=validation_runners, batch_id=validation_batch)
+            concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
+            #for validation data - just transform, no fit
+            X_test, y_test = self.scale_and_sequence(concatenated, day_indexes, scaling=ScalingMode.ONLY_TRANSFORM)
+            X_test = list(X_test.values())
+            return (X_test, y_test)
+        else:
+            print("No validation runners or batch provided")
+            return None
 
-        #LOAD and INITIALIZE THE ARCHITECTURE
-        model_name = self.architecture["name"]
-        model_inputs = len(self.cfg['model']['input'])
-        if model_inputs==0:
-            print("model inputs not defined in cfg")
-            return
+    #X_train bude list
+    def train(self, X_train, y_train, batch_number = 1, total_batches = 1):
+    
+        if batch_number == 1:
+            print("Batch 1 - INITIALIZING MODEL")
+            input_shape = []
+            for idx, val in enumerate(X_train):
+                input_shape.append((val.shape[1], val.shape[2]))
 
-        if len(X_train) != model_inputs:
-            print(f"Number of inputs doesnt match model requirements len(X_train){len(X_train)} vs model input cfg {model_inputs}")
-            return
+            #LOAD and INITIALIZE THE ARCHITECTURE
+            model_name = self.architecture["name"]
+            model_inputs = len(self.cfg['model']['input'])
+            if model_inputs==0:
+                print("model inputs not defined in cfg")
+                return
 
-        model_params = self.architecture.get("params", {})
+            if len(X_train) != model_inputs:
+                print(f"Number of inputs doesnt match model requirements len(X_train){len(X_train)} vs model input cfg {model_inputs}")
+                return
 
-        print("MODEL: ", model_name)
-        print("MODEL PARAMS:", model_params)
+            model_params = self.architecture.get("params", {})
 
-        arch_function = eval("arch."+model_name+"."+model_name)
-        print("FUNCTION TO CALL",arch_function)
+            print("MODEL: ", model_name)
+            print("MODEL PARAMS:", model_params)
 
-        self.metadata["arch_function"] =  inspect.getsource(arch_function)
-        #print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
+            arch_function = eval("arch."+model_name+"."+model_name)
+            print("FUNCTION TO CALL",arch_function)
 
-        # **model_params
-        self.model, self.custom_layers = arch_function(input_shape, **model_params)
-        print("COMPILED MODEL LOADED")
+            self.metadata["arch_function"] =  inspect.getsource(arch_function)
+            #print("INSPECTING THE ARCH FUNC",self.metadata["arch_function"])
+
+            # **model_params
+            self.model, self.custom_layers = arch_function(input_shape, **model_params)
+            print("COMPILED MODEL LOADED")
+        else:
+            print("RETRAINING THE MODEL")
 
         #FIT PARAMS (key callback is processed)
         # we use all excepts callbacks
@@ -210,21 +221,29 @@ class ModelML:
                 CallbackClass = getattr(cb, callback_name)
                 fit_params['callbacks'].append(CallbackClass(**callback_params))
 
-
-        #TODO pridat validate during fit - externi runnery pro validace
+        #load external validation data during fit, if required
+        validation_tuple = None
+        if self.cfg.get("validation",{}).get("validate_during_fit", False) is True:
+            #naloadujeme bud runner nebo batch a posleme
+            validation_tuple = self.load_validation_data()
+            if validation_tuple is not None:
+                fit_params["validation_data"] = validation_tuple
 
         res_object=self.model.fit(X_train,y_train, **fit_params)
-        self.metadata["history"] = res_object.history
+        key = f"batch_{batch_number}_{total_batches}"
+        self.metadata["history"][key]=res_object.history
 
         if self.cfg.get("save_best", False):
             try:
                 filepath = fit_cfg["callbacks"]["ModelCheckpoint"]["filepath"]
                 #monitored metrics and its best value and epoch
                 metric = fit_cfg["callbacks"]["ModelCheckpoint"]["monitor"]
-                monitor_dict = self.metadata["history"][metric]
+                monitor_dict = res_object.history[metric]
                 best_epoch = monitor_dict.index(min(monitor_dict)) + 1 
                 best_value = min(monitor_dict)
-                self.metadata["history"]["saved_best"] = {"epoch": best_epoch, metric: best_value}
+                if self.metadata["history"].get("saved_best", None) is None:
+                    self.metadata["history"]["saved_best"] = {}
+                self.metadata["history"]["saved_best"][key] = {"epoch": best_epoch, metric: best_value}
                 self.model = load_model(filepath)
                 print(f"CHECKPOINTED MODEL USED [{metric}]: {best_value} epoch: {best_epoch}")
             except Exception as e:
@@ -233,9 +252,9 @@ class ModelML:
         mu.send_to_telegram("TRAINING FINISHED")
 
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
-    def train_and_store(self, X_train, y_train):
+    def train_and_store(self, X_train, y_train, batch_number, total_batches):
 
-        self.train(X_train, y_train)
+        self.train(X_train, y_train, batch_number, total_batches)
         #save the model
         self.save()
 
@@ -332,7 +351,9 @@ class ModelML:
 
             #join features with the same time, scale it and add to input list
             joined_features = np.concatenate(features_to_join, axis=1)
-            joined_features = self.scalersX[input_item].transform(joined_features)
+            #pokud je pro dany vstup definovan scaler tak scalujeme
+            if self.scalersX.get(input_item, None) is not None:
+                joined_features = self.scalersX[input_item].transform(joined_features)
             #as padding is done with NaNs, change it to 0 for the model
             joined_features = np.nan_to_num(joined_features)
             #reshape to 3d batch_size(1), sequence_length, feature   ()
@@ -424,7 +445,7 @@ class ModelML:
 
         result_list = []
 
-        for runner_id in runner_ids:
+        for runner_id in tqdm(runner_ids):
             daily_dict = defaultdict(list)
             #returns dictionary with keys of distinct_sources
             sources = mu.load_runner(runner_id, self.distinct_sources, False)
@@ -683,8 +704,9 @@ class ModelML:
     #NYNI BY DEFAULT LAST VALUE
     #indexes = denni index, 
     
-    #muze byt volano z train nebo evaluate, podle toho incializujeme scalery
-    def scale_and_sequence(self, concat_data, day_indexes, fit_scalers = True):
+    #muze byt volano z train nebo evaluate, podle toho but i fitujeme nebo jen transformujeme
+    #muze byt take volano v ramci batchove pripravy, kdy pouzivame fit partial
+    def scale_and_sequence(self, concat_data, day_indexes, scaling: ScalingMode = ScalingMode.FIT_AND_TRANSFORM):
 
         source_dict = self.prep_data(concat_data, day_indexes)
 
@@ -755,16 +777,26 @@ class ModelML:
             features = np.array(features)
             features = features.T
 
-            #zatim scalerX je definovy na zacatku pro kazdy vstup
-            if fit_scalers is True:
-                features = self.scalersX[key].fit_transform(features)
-            else:
-                features = self.scalersX[key].transform(features)
+            #scalerX je nakonfiguruvan per vstup
+            if self.scalersX.get(key,None) is not None:
+                print(f"Scaling using: {scaling}")
+                match scaling:
+                    case ScalingMode.FIT_AND_TRANSFORM:
+                        features = self.scalersX[key].fit_transform(features)
+                    case ScalingMode.PARTIAL_FIT_AND_TRANSFORM:
+                        self.scalersX[key].partial_fit(features)
+                        features = self.scalersX[key].transform(features)
+                    case ScalingMode.ONLY_TRANSFORM:
+                        features = self.scalersX[key].transform(features)
+                    case _:
+                        raise Exception("unknow scaling method for scalerX")
 
-            print("scaler vidi")
-            print("pocet featur:", self.scalersX[key].n_features_in_)
-            #print(scaler.feature_names_in_)
-            print("pocet samplu:", self.scalersX[key].n_samples_seen_)
+                print("scaler vidi")
+                print("pocet featur:", self.scalersX[key].n_features_in_)
+                #print(scaler.feature_names_in_)
+                print("pocet samplu:", self.scalersX[key].n_samples_seen_)
+            else:
+                print(f"NO SCALER defined for {key}")
 
             # Transpose Back
             # Converting to a list of three items, each being a numpy array
@@ -843,12 +875,18 @@ class ModelML:
         y_train = np.array(y_train)
         y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
         
-        print("Scaling y_train")
+        print(f"Scaling y_train, mode: {scaling}")
         if self.scalerY is not None:
-            if fit_scalers is True:
-                y_train = self.scalerY.fit_transform(y_train)
-            else:
-                y_train = self.scalerY.transform(y_train)
+            match scaling:
+                case ScalingMode.FIT_AND_TRANSFORM:
+                    y_train = self.scalerY.fit_transform(y_train)
+                case ScalingMode.PARTIAL_FIT_AND_TRANSFORM:
+                    self.scalerY.partial_fit(y_train)
+                    y_train = self.scalerY.transform(y_train)
+                case ScalingMode.ONLY_TRANSFORM:
+                    y_train = self.scalerY.transform(y_train)
+                case _:
+                    raise Exception("unknow scaling method")
 
             scaler = self.scalerY
             print("scaler vidi")
