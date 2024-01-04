@@ -32,12 +32,12 @@
     #validation_freq =
 
 # ModelCheckpoint to save the model with the lowest validation loss
-# [fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
-#     filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
-#     monitor='val_loss'
-#     mode='min' #max
-#     save_best_only=true #save best or save each epoch
-#     verbose=1
+[fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
+    filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
+    monitor='val_loss'
+    mode='min' #max
+    save_best_only=true #save best or save each epoch
+    verbose=1
 
 # [fit.callbacks.EarlyStopping]
 #     monitor='val_loss' #'mean_squared_error' #val_loss
