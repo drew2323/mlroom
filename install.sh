@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Creating a swap file
-sudo fallocate -l 15GB /swapfile
+sudo fallocate -l 25GB /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
@@ -29,11 +29,12 @@ pip install -e git+https://github.com/drew2323/mlroom.git#egg=mlroom
 pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install git+https://github.com/drew2323/keras-tcn.git
 pip install tqdm
-
-#pip install —U keras-nlp
-
+pip install —U keras-nlp
 pip install —-upgrade keras-nlp-nightly
 pip install —U keras
+cd src/mlroom/mlroom
 
 # Navigate to the mlroom directory
 cd src/mlroom/mlroom
+
+#pip install —U keras-nlp

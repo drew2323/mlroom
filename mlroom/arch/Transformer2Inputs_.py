@@ -12,6 +12,7 @@ from keras.models import Sequential, Model
 from keras.layers import MultiHeadAttention, GlobalAveragePooling1D, Concatenate, LayerNormalization, Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM, BatchNormalization, AveragePooling1D, Input
 from keras.optimizers import Adam
 from keras_nlp.layers import SinePositionEncoding, TransformerEncoder
+from keras.regularizers import l2
 
 # Define Transformer block - bud takto explciitne a nebo TransformerEncoder
 # def transformer_block(inputs, num_heads, ff_dim, rate=0.1):
@@ -43,6 +44,8 @@ def Transformer2Inputs_(input_shape, **params):
     learning_rate = params.get("learning_rate", 0.001)
     #transformer layers for each input
     trans_layers = params.get("trans_layers", [1,1])
+    l2_reg = params.get("l2_reg", 0.001)  # Added L2 regularization parameter
+
 
     # # Transformer block for each time series
     # transformer_ts1 = transformer_block(pos_encoding_1, num_heads=2, ff_dim=64)
@@ -64,10 +67,12 @@ def Transformer2Inputs_(input_shape, **params):
 
     # Apply required numbers of Transformer Encoders to each input
     for _ in range(trans_layers[0]):
-        x1 = TransformerEncoder(intermediate_dim=128, num_heads=5)(x1)
+        x1 = TransformerEncoder(intermediate_dim=64, num_heads=5)(x1)
+        x1 = Dropout(0.5)(x1)  # Adjust the dropout rate as needed
 
     for _ in range(trans_layers[1]):
-        x2 = TransformerEncoder(intermediate_dim=128, num_heads=17)(x2)
+        x2 = TransformerEncoder(intermediate_dim=128, num_heads=4)(x2)
+        x2 = Dropout(0.5)(x2) 
 
     # After the TransformerEncoder layers - to allow concatenation
     x1 = GlobalAveragePooling1D()(x1)

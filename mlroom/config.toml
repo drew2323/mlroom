@@ -59,8 +59,8 @@
 [model]
      #vsechny ceny logreturn test
     name = "Trans2D" #name that would be used to predict
-    version = 0.3
-    note = "Test transformer s categorical entropy, 0,1,2 labeling and log_returns"
+    version = 0.4
+    note = "Better LR and dropouts added"
 
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
@@ -84,9 +84,9 @@
 [model.architecture]
     name = "Transformer2Inputs_" #"Conv1D2Inputs_" #"Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params] #params that are passed into model function (needed to compile)
-    learning_rate = 0.0001 #0.00005
+    learning_rate = 0.00005 #0.00005
     trans_layers = [1,1] #number of transformer layers for each input
-#    l2_reg = 0.001 # Added L2 regularization parameter
+    l2_reg = 0.001 # Added L2 regularization parameter
 
 
 
