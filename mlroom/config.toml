@@ -5,16 +5,16 @@
     upload_server = "5.161.179.223" #where to upload model
     download_server = "5.161.179.223" #to download batches/runners
     upload = true #nyni se uploaduje po kazdem batchi
-    save_best = false #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
+    save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
 [train]
-    #runners = ["fd29c97a-a141-4917-88de-078b045758c8"]
-    batch = "ddc0d625"
+    #runners = ["8fefeaa9-0c85-448a-83af-0bf0657d6012"]
+    batch = "c1cf7114"
     remove_cross_sequences = true #nyni nefunguje, je true
-    runners_per_batch = 999 #how many runners per batch
+    runners_per_batch = 9999 #how many runners per batch
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
-    runners = ["1267c150-0e57-41fc-9930-1574fef27b42"] #runners or batch as sources
+    runners = ["878af6c2-f19c-45cf-a220-a241e9cce04e","d9a5f888-014b-40ce-a806-22c8b2603757","ab0f089c-6512-4c9e-8263-a98c7a216956"] #runners or batch as sources
     #batch = "53e04a2a" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
     #test_size = 0 #DECOMM - zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
@@ -25,6 +25,9 @@
     epochs = 5
     validation_split = 0 #validace po kazde z epoch (ubira z testovacich dat
     verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
+    
+    class_weight = "balanced" #can be dict(goes directly to fit) or string - then it calculates balanced weights
+    #{0: 2.2578978447003246, 1: 0.434418314019541, 2: 3.918780425313861}
 
     #these params are used only for validation_data
     #validation_steps = 
@@ -32,12 +35,12 @@
     #validation_freq =
 
 # ModelCheckpoint to save the model with the lowest validation loss
-[fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
-    filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
-    monitor='val_loss'
-    mode='min' #max
-    save_best_only=true #save best or save each epoch
-    verbose=1
+# [fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
+#     filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
+#     monitor='val_loss'
+#     mode='min' #max
+#     save_best_only=true #save best or save each epoch
+#     verbose=1
 
 # [fit.callbacks.EarlyStopping]
 #     monitor='val_loss' #'mean_squared_error' #val_loss
@@ -58,9 +61,9 @@
 
 [model]
      #vsechny ceny logreturn test
-    name = "Trans2D" #name that would be used to predict
-    version = 0.4
-    note = "Better LR and dropouts added"
+    name = "TransTune" #name that would be used to predict
+    version = 0.3
+    note = "Classweights testes"
 
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
@@ -84,7 +87,7 @@
 [model.architecture]
     name = "Transformer2Inputs_" #"Conv1D2Inputs_" #"Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params] #params that are passed into model function (needed to compile)
-    learning_rate = 0.00005 #0.00005
+    learning_rate = 0.001 #0.00005
     trans_layers = [1,1] #number of transformer layers for each input
     l2_reg = 0.001 # Added L2 regularization parameter
 

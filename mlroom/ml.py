@@ -25,6 +25,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import time
 from traceback import format_exc
+from sklearn.utils.class_weight import compute_class_weight
 #Basic classes for machine learning
 #drzi model a jeho zakladni nastaveni
 
@@ -148,34 +149,8 @@ class ModelML:
         self.train_remove_cross_sequences = train_remove_cross_sequences
         self.custom_layers = {}
 
-    #inicializace modelu podle vlozeneho pluginu a pripadne dalsich
-    #TODO ulozeni obsahu architekt funkce skrz inspect (k dispozici)
-    def initialize_model(architecture: dict):
-        pass
-
-    
-    def load_validation_data(self):
-        """Loads external validation data from runners or batch 
-            returns tuple (X,Y) or None
-        """
-        validation_runners = self.cfg.get("validation",{}).get("runners", None)
-        validation_batch = self.cfg.get("validation",{}).get("batch", None)
-        if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
-            print(f"Loading validations {validation_runners=} {validation_batch=}")
-            source_data = self.load_data(runners_ids=validation_runners, batch_id=validation_batch)
-            concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
-            #for validation data - just transform, no fit
-            X_test, y_test = self.scale_and_sequence(concatenated, day_indexes, scaling=ScalingMode.ONLY_TRANSFORM)
-            X_test = list(X_test.values())
-            return (X_test, y_test)
-        else:
-            print("No validation runners or batch provided")
-            return None
-
-    #X_train bude list
-    def train(self, X_train, y_train, batch_number = 1, total_batches = 1):
-    
-        if batch_number == 1:
+    #INIITIALIZE and COMPILE MODEL ARCHITECTURE
+    def initialize_model(self, X_train):
             print("Batch 1 - INITIALIZING MODEL")
             input_shape = []
             for idx, val in enumerate(X_train):
@@ -206,33 +181,31 @@ class ModelML:
             # **model_params
             self.model, self.custom_layers = arch_function(input_shape, **model_params)
             print("COMPILED MODEL LOADED")
+
+    
+    def load_validation_data(self):
+        """Loads external validation data from runners or batch 
+            returns tuple (X,Y) or None
+        """
+        validation_runners = self.cfg.get("validation",{}).get("runners", None)
+        validation_batch = self.cfg.get("validation",{}).get("batch", None)
+        if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
+            print(f"Loading validations {validation_runners=} {validation_batch=}")
+            source_data = self.load_data(runners_ids=validation_runners, batch_id=validation_batch)
+            concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
+            #for validation data - just transform, no fit
+            X_test, y_test = self.scale_and_sequence(concatenated, day_indexes, scaling=ScalingMode.ONLY_TRANSFORM)
+            X_test = list(X_test.values())
+            return (X_test, y_test)
         else:
-            print("RETRAINING THE MODEL")
+            print("No validation runners or batch provided")
+            return None
 
-        #FIT PARAMS (key callback is processed)
-        # we use all excepts callbacks
+    def load_best_model(self, res_object, key):
+        """
+        Loads back model with best metrics in ModelCheckpoint
+        """
         fit_cfg = self.cfg["fit"]
-        fit_params = {k: v for k, v in fit_cfg.items() if k != "callbacks"}
-
-        #INIT CALLBACKS from PARAMS
-        if fit_cfg.get("callbacks", False):
-            fit_params['callbacks'] = []
-            for callback_name, callback_params in fit_cfg["callbacks"].items():
-                CallbackClass = getattr(cb, callback_name)
-                fit_params['callbacks'].append(CallbackClass(**callback_params))
-
-        #load external validation data during fit, if required
-        validation_tuple = None
-        if self.cfg.get("validation",{}).get("validate_during_fit", False) is True:
-            #naloadujeme bud runner nebo batch a posleme
-            validation_tuple = self.load_validation_data()
-            if validation_tuple is not None:
-                fit_params["validation_data"] = validation_tuple
-
-        res_object=self.model.fit(X_train,y_train, **fit_params)
-        key = f"batch_{batch_number}_{total_batches}"
-        self.metadata["history"][key]=res_object.history
-
         if self.cfg.get("save_best", False):
             try:
                 filepath = fit_cfg["callbacks"]["ModelCheckpoint"]["filepath"]
@@ -249,12 +222,67 @@ class ModelML:
             except Exception as e:
                 print("ERROR in CHECKPOINT"+ str(e)+ format_exc())
 
+    def populate_fit_params(self, validation_tuple = None, y_train = None):
+       #POPULATE FIT PARAMS (key callback is processed)
+        # we use all excepts callbacks
+        fit_cfg = self.cfg["fit"]
+        fit_params = {k: v for k, v in fit_cfg.items() if k != "callbacks" or k!="class_weight"}
+
+        #INIT CALLBACKS from PARAMS
+        if fit_cfg.get("callbacks", False):
+            fit_params['callbacks'] = []
+            for callback_name, callback_params in fit_cfg["callbacks"].items():
+                CallbackClass = getattr(cb, callback_name)
+                fit_params['callbacks'].append(CallbackClass(**callback_params))
+
+        #load external validation data during fit, if required
+        if self.cfg.get("validation",{}).get("validate_during_fit", False) is True and validation_tuple is not None:
+            fit_params["validation_data"] = validation_tuple
+        
+        #CLASS WEIGHT
+        if self.cfg["fit"].get("class_weight", False):
+            class_weight = self.cfg["fit"]["class_weight"]
+            #jde primo o dictionary, davame hodnoty
+            if isinstance(class_weight, dict):
+                fit_params["class_weight"] = class_weight
+                print("Class_weight set to",class_weight)
+            #jde o string ("balanced") vypocitavama distribuci automaticky
+            elif isinstance(class_weight, str):
+                y_train_1d = y_train.ravel() 
+                #Calculate class weights distribution calculation
+                class_weights = compute_class_weight(class_weight, classes=np.unique(y_train_1d), y=y_train_1d)
+                class_weight_dict = dict(enumerate(class_weights))
+                print("Calculated class_weight",class_weight_dict)
+                fit_params["class_weight"] = class_weight_dict
+            else:
+                print("not valid setting in class_weight")
+
+        return fit_params
+
+    #X_train bude list
+    def train(self, X_train, y_train, batch_number = 1, total_batches = 1, validation_tuple = None):
+        #populate params that go to model.fit
+        fit_params = self.populate_fit_params(validation_tuple, y_train)
+
+        #INIT MODEL on FIRST BATCH
+        if batch_number == 1:
+            self.initialize_model(X_train)
+        else:
+            print("RETRAINING THE MODEL")
+
+        res_object=self.model.fit(X_train,y_train, **fit_params)
+        key = f"batch_{batch_number}_{total_batches}"
+        self.metadata["history"][key]=res_object.history
+
+        #if it was required, loads back model with best metrics 
+        self.load_best_model(res_object, key)
+
         mu.send_to_telegram("TRAINING FINISHED")
 
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
-    def train_and_store(self, X_train, y_train, batch_number, total_batches):
+    def train_and_store(self, X_train, y_train, batch_number, total_batches, validation_tuple = None):
 
-        self.train(X_train, y_train, batch_number, total_batches)
+        self.train(X_train, y_train, batch_number, total_batches, validation_tuple)
         #save the model
         self.save()
 

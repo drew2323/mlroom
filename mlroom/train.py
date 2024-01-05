@@ -21,6 +21,7 @@ import argparse
 import toml
 import time
 
+
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -196,8 +197,13 @@ def train_batch(model_instance: ModelML, source_data: list, batch_number = 1, to
         print("y_train", np.shape(y_train))
         print("y_test", np.shape(y_test))
 
+    validation_tuple = None
+    if CONFIG.get("validation",{}).get("validate_during_fit", False) is True:
+        #naloadujeme bud runner nebo batch a posleme do treninku
+        validation_tuple = model_instance.load_validation_data()
+
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
-    model_instance.train_and_store(X_train, y_train, batch_number, total_batches)
+    model_instance.train_and_store(X_train, y_train, batch_number, total_batches, validation_tuple)
 
     print(f"Batch {batch_number}/{total_batches} TRAINGING FINISHED")
     #VALIDATION PART

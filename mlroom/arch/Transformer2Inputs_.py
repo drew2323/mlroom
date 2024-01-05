@@ -67,12 +67,14 @@ def Transformer2Inputs_(input_shape, **params):
 
     # Apply required numbers of Transformer Encoders to each input
     for _ in range(trans_layers[0]):
-        x1 = TransformerEncoder(intermediate_dim=64, num_heads=5)(x1)
-        x1 = Dropout(0.5)(x1)  # Adjust the dropout rate as needed
+        x1 = TransformerEncoder(intermediate_dim=64, num_heads=5, dropout=0.2)(x1)
+        #x1 = BatchNormalization()(x1)
+        #x1 = Dropout(0.5)(x1)  # Adjust the dropout rate as needed
 
     for _ in range(trans_layers[1]):
-        x2 = TransformerEncoder(intermediate_dim=128, num_heads=4)(x2)
-        x2 = Dropout(0.5)(x2) 
+        x2 = TransformerEncoder(intermediate_dim=128, num_heads=4, dropout=0.2)(x2)
+        #x2 = BatchNormalization()(x2)
+        #x2 = Dropout(0.5)(x2) 
 
     # After the TransformerEncoder layers - to allow concatenation
     x1 = GlobalAveragePooling1D()(x1)
