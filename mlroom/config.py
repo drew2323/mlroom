@@ -3,6 +3,9 @@ from pathlib import Path
 import toml
 import os
 
+TOML_FILE = 'config.toml'
+#TOML_FILE = 'config_tick.toml'
+
 def load_config(filename):
     with open(filename, 'r') as file:
         config_string = file.read()
@@ -12,7 +15,7 @@ def load_config(filename):
 # Path to the directory containing the script
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Path to the .cfg file
-cfg_file = os.path.join(script_dir, 'config.toml')
+cfg_file = os.path.join(script_dir, TOML_FILE)
 CONFIG, CONFIG_STRING = load_config(cfg_file)
 
 #urcuje dostupne zdroje a jejich granularitu, od nejvyssi po nejnizsi - pouziva se pri sekvencingu

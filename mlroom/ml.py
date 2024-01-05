@@ -244,8 +244,10 @@ class ModelML:
             class_weight = self.cfg["fit"]["class_weight"]
             #jde primo o dictionary, davame hodnoty
             if isinstance(class_weight, dict):
-                fit_params["class_weight"] = class_weight
-                print("Class_weight set to",class_weight)
+                # Convert string keys to integer keys (bc of TOML)
+                class_weight_int_keys = {int(key): value for key, value in class_weight.items()}
+                fit_params["class_weight"] = class_weight_int_keys
+                print("Class_weight set to",class_weight_int_keys)
             #jde o string ("balanced") vypocitavama distribuci automaticky
             elif isinstance(class_weight, str):
                 y_train_1d = y_train.ravel() 
