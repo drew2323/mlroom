@@ -8,14 +8,14 @@
     save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
 [train]
-    runners = ["3dc6e3ac-79e0-44c1-baaf-ef2858afc564","7310775f-2f18-46e7-97a4-77734495abdc","d93439ae-4917-4d6a-9f96-4f25b93e9024"]
-    #batch = "c1cf7114"
+    #runners = ["3dc6e3ac-79e0-44c1-baaf-ef2858afc564","7310775f-2f18-46e7-97a4-77734495abdc","d93439ae-4917-4d6a-9f96-4f25b93e9024"]
+    batch = "bc7169c2"
     remove_cross_sequences = true #nyni nefunguje, je true
     runners_per_batch = 9999 #how many runners per batch
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
-    runners = ["a20a4022-dfa3-43ae-bde1-632ad63cc139"] #runners or batch as sources
-    #batch = "53e04a2a" #nad konkretnim batchem
+    #runners = ["a20a4022-dfa3-43ae-bde1-632ad63cc139"] #runners or batch as sources
+    batch = "442fee3b" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
     #test_size = 0 #DECOMM - zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
     #send_val_data_to_fit
@@ -76,12 +76,12 @@
 [model.input.highres]
     cbar_indicators = ["crsi14","daytimetick","slopetick5","tick_count1","tick_price_log_return","tick_ROC","tick_trades","tick_volume_log_return","volume_tick_divergence","tick_vol_window"]
     #cbar_indicators = ["tick_volume","tick_trades", "daytimetick", "tick_price_log_return", "tick_price"]
-    sequence_length = 100
+    sequence_length = 40
     scaler = "StandardScaler"
 [model.input.lowres]
     bars = ["trades","vwap","close","open","high","low"]
     indicators = ["daytimebar", "divema", "slope5", "voldiv", "rsi14MA", "emaSlow","vwap_log_return","close_log_return","open_log_return","high_log_return","low_log_return"]
-    sequence_length = 200
+    sequence_length = 100
     scaler = "StandardScaler"
 # [model.input.daily]
 #     dailyBars = ["rsi", "volume_sma_divergence", "open", "close"]
