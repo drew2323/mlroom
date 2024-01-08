@@ -1,12 +1,12 @@
 import requests
-from mlroom.config import WEB_API_KEY, CONFIG
+from mlroom.config import WEB_API_KEY
 import json
 # enables to call internal services externally
 #will be moved to external module, 
 
-def upload_file(filename):
+def upload_file(filename, server):
     """Upload a file to the specified URL."""
-    api_url = f"http://{CONFIG['upload_server']}:8000/model/upload_model"
+    api_url = f"http://{server}:8000/model/upload_model"
     headers = {'X-API-Key': WEB_API_KEY} 
 
     # Ensure filename is a string, not a Path object
@@ -26,9 +26,9 @@ def upload_file(filename):
 
 
 
-def get_archived_runners_list_by_batch_id(batch_id):
+def get_archived_runners_list_by_batch_id(batch_id, server):
     """Retrieve a list of runner IDs for a given batch ID."""
-    api_url = f"http://{CONFIG['download_server']}:8000/archived_runners/batch/{batch_id}"
+    api_url = f"http://{server}:8000/archived_runners/batch/{batch_id}"
     headers = {'X-API-Key': WEB_API_KEY} 
 
     response = requests.get(api_url, headers=headers)
@@ -40,9 +40,9 @@ def get_archived_runners_list_by_batch_id(batch_id):
         print(f"Error fetching runnerlist of Batch {batch_id}: {response.status_code}, Detail: {error_detail}")
         return -1, []
     
-def get_archived_runner_header_by_id(runner_id):
+def get_archived_runner_header_by_id(runner_id, server):
     """Retrieve the header data for a specific runner by ID."""
-    api_url = f"http://{CONFIG['download_server']}:8000/archived_runners/{runner_id}"
+    api_url = f"http://{server}:8000/archived_runners/{runner_id}"
     headers = {'X-API-Key': WEB_API_KEY} 
 
     response = requests.get(api_url, headers=headers)
@@ -55,9 +55,9 @@ def get_archived_runner_header_by_id(runner_id):
         print(error)
         return -1, error
 
-def get_archived_runner_detail_by_id(runner_id):
+def get_archived_runner_detail_by_id(runner_id, server):
     """Retrieve the detail data for a specific runner by ID."""
-    api_url = f"http://{CONFIG['download_server']}:8000/archived_runners_detail/{runner_id}"
+    api_url = f"http://{server}:8000/archived_runners_detail/{runner_id}"
     headers = {'X-API-Key': WEB_API_KEY} 
 
     response = requests.get(api_url, headers=headers)
@@ -71,13 +71,13 @@ def get_archived_runner_detail_by_id(runner_id):
         return -1, error
 
 # Local debugging
-if __name__ == '__main__':
-    batch_id = "73ad1866"
-    res, val = get_archived_runners_list_by_batch_id(batch_id=batch_id)
-    print("batchrunnrs:",val)
+# if __name__ == '__main__':
+#     batch_id = "73ad1866"
+#     res, val = get_archived_runners_list_by_batch_id(batch_id=batch_id)
+#     print("batchrunnrs:",val)
     
-    res, val = get_archived_runner_header_by_id("5b3b9b15-75ac-43c6-8a6c-bf2b6a523faf")
-    print("runner:", val)
+#     res, val = get_archived_runner_header_by_id("5b3b9b15-75ac-43c6-8a6c-bf2b6a523faf")
+#     print("runner:", val)
 
-    res, val = get_archived_runner_detail_by_id("5b3b9b15-75ac-43c6-8a6c-bf2b6a523faf")
-    print("runner detail:", val)
+#     res, val = get_archived_runner_detail_by_id("5b3b9b15-75ac-43c6-8a6c-bf2b6a523faf")
+#     print("runner detail:", val)

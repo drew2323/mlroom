@@ -9,6 +9,9 @@ import requests
 from keras.models import model_from_json
 import pickle
 
+def red(text): return f"\033[32m{text}\033[0m"  # Red color
+def bold(text): return f"\033[4m{text}\033[0m"  # Bold text
+
 def send_to_telegram(message):
     apiToken = '5836666362:AAGPuzwp03tczMQTwTBiHW6VsZZ-1RCMAEE'
     chatID = '5029424778'
@@ -113,11 +116,11 @@ def convert_lists_to_numpy(data):
             data[key] = np.array(value)
     return data
 
-def load_runner(runner_id, data_to_fetch, asnumpy = False):
+def load_runner(runner_id, data_to_fetch, server, asnumpy = False):
     """
     Vraci pro dany runner data uvedena ve vstupnim listu data_to_fetch
     """
-    res, sada = es.get_archived_runner_detail_by_id(runner_id)
+    res, sada = es.get_archived_runner_detail_by_id(runner_id, server)
     if res == 0:
         print("ok")
     else:

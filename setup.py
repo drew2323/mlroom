@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mlroom',
-    version='0.428',
+    version='0.429',
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -14,7 +14,7 @@ setup(
         'scikit-learn==1.3.2',  # Specify minimum version requirement
         'appdirs',
         'alpaca-py',
-        'joblib==1.3.2'
+        'joblib==1.3.2',
         #'keras-tcn'
     ],
 )

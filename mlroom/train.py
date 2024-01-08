@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 import mlroom.utils.mlutils as mu
+from mlroom.utils.mlutils import red, bold
 from keras.layers import LSTM, Dense
 from keras.callbacks import EarlyStopping
 #import matplotlib
@@ -13,15 +14,15 @@ import matplotlib.pyplot as plt
 from mlroom.ml import ModelML
 from mlroom.utils.enums import PredOutput, Source, TargetTRFM, ScalingMode
 import mlroom.arch.architectures as ma
-from mlroom.config import CONFIG, CONFIG_STRING
+from mlroom.config import DEF_CACHE_FILE,load_config
 # from collections import defaultdict
 # from operator import itemgetter
-from joblib import load
+from joblib import load, dump
 import argparse
 import toml
 import time
 
-
+# CONFIG, CONFIG_STRING = {}, None
 # region Notes
 
 #ZAKLAD PRO TRAINING SCRIPT na vytvareni model u
@@ -137,12 +138,21 @@ import time
 #testlist generator api
 
 # endregion
-def main():
-    train()
+def main(mode, to_file = None, from_file = None, config_file = None):
+    #load TOML (provided or default)
+    global CONFIG, CONFIG_STRING
+    CONFIG, CONFIG_STRING = load_config(config_file)
+    """
+    run.py train
+    run.py train --to_file input_data.joblib
+    run.py train --from_file input_data.joblib
+    run.py prepare --to_file input_data.joblib
+    """
+    hub(mode, to_file, from_file)
 
 #TODO vyzkouset jak se vysledek bude lisit pri pouzivani batchu a partial fitu
 #POZOR pri batchi je dulezite, aby kazda batch mela reprezentativní vzorek, zejména target, aby obsahoval vsechny hodnoty
-def train_batch(model_instance: ModelML, source_data: list, batch_number = 1, total_batches = 1):
+def train_batch(model_instance: ModelML, source_data: list, mode, to_file, batch_number = 1, total_batches = 1):
     concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
 
     #scaling mode (if 1 batch use fit_and_transofrm, if more batches - use partial)
@@ -160,13 +170,12 @@ def train_batch(model_instance: ModelML, source_data: list, batch_number = 1, to
 
     X_train = list(X_train.values())
 
-    print("After sequencing")
+    print(red("Post sequencing summary"))
     print("X_train")
     for idx, x in enumerate(X_train):
-        print("input:",idx)
-        print("source:X_train", np.shape(x))
+        print(red(f"input: {idx} {np.shape(x)}"))
     
-    print("target:y_train", np.shape(y_train))
+    print(red(f"y_train: {np.shape(y_train)}"))
   
     source_data = None
 
@@ -202,39 +211,85 @@ def train_batch(model_instance: ModelML, source_data: list, batch_number = 1, to
         #naloadujeme bud runner nebo batch a posleme do treninku
         validation_tuple = model_instance.load_validation_data()
 
+    #SAVE CACHED DATA
+
+    if to_file is not None:
+        save_cache(file_name=to_file, X_train=X_train,y_train=y_train,batch_number=batch_number,total_batches=total_batches,validation_tuple=validation_tuple, scalerY=model_instance.scalerY, scalersX=model_instance.scalersX)
+
+    if mode == "prepare":
+        print("Data prepared.")
+        return
+
     #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
     model_instance.train_and_store(X_train, y_train, batch_number, total_batches, validation_tuple)
 
-    print(f"Batch {batch_number}/{total_batches} TRAINGING FINISHED")
+    print(red(f"Batch {batch_number}/{total_batches} TRAINGING FINISHED"))
     #VALIDATION PART
 
-def train():
+def save_cache(file_name, **dict_to_save):
+    # Save the data to a file
+    file_name = DEF_CACHE_FILE if file_name is None else file_name
+    dump(dict_to_save, file_name, compress=9)
+    print(bold(f"Data saved to {file_name}"))
+
+def load_cache(file_name):
+    return load(file_name)
+
+def hub(mode, to_file, from_file):
     validation_runners = CONFIG.get("validation",{}).get("runners", None)
     validation_batch = CONFIG.get("validation",{}).get("batch", None)
-
     np.set_printoptions(threshold=10,edgeitems=5)
 
     model_instance = ModelML(cfg=CONFIG, cfg_toml=CONFIG_STRING)
     
-    #Loads training data (by distinct_sources)
-    source_data = model_instance.load_data() #per day as list
-    src_length = len(source_data) 
-    items_in_batch = model_instance.train_runners_per_batch
-    print("Runners per batch:",items_in_batch)
-    items_in_batch = src_length if items_in_batch is None or items_in_batch>src_length else items_in_batch
-    total_batches = -(-src_length // items_in_batch)  # Calculate the total number of batches
+    #ulozeny argumenty z cli
+    model_instance.metadata["history"]["args"] = args
 
-    print("Number of days requested",src_length)
-    #print("Iterate to",items_in_batch)
-    for i in range(0, len(source_data), items_in_batch):
-        batch_number = i // items_in_batch + 1
-        print(f"Batch number {batch_number}/{total_batches}")
-        print(f"Items {i} to {i+items_in_batch}")
-        batch_source_data = source_data[i:i + items_in_batch]
-        # Process the batch here
-        train_batch(model_instance, batch_source_data, batch_number, total_batches)
+    #to_file is present = prepare/train with cache storing
+    if from_file is None:
+        #Loads training data (by distinct_sources)
+        source_data = model_instance.load_data() #per day as list
+        src_length = len(source_data) 
+        items_in_batch = model_instance.train_runners_per_batch
+        print("Runners per batch:",items_in_batch)
+        items_in_batch = src_length if items_in_batch is None or items_in_batch>src_length else items_in_batch
+        total_batches = -(-src_length // items_in_batch)  # Calculate the total number of batches
 
-    print("STARTING VALIDATION")
+        # NOTE Batch zatim nepouzivat, vnitrni casti jako cache uz s tim nepocitaji a pro trenink je lepsi vse v jednom
+        print("Number of days requested",src_length)
+        #print("Iterate to",items_in_batch)
+        for i in range(0, len(source_data), items_in_batch):
+            batch_number = i // items_in_batch + 1
+            print(f"Batch number {batch_number}/{total_batches}")
+            print(f"Items {i} to {i+items_in_batch}")
+            batch_source_data = source_data[i:i + items_in_batch]
+            # Process the batch here
+            train_batch(model_instance, batch_source_data, mode, to_file, batch_number, total_batches)
+    #from_file is present (its training with loading from cache)
+    else:
+        cache = load_cache(from_file)
+        if cache is None:
+            print("ERROR LOADING CACHE")
+            return 
+        print(red(f"Loaded DATA from cache {from_file}"))
+        X_train = cache["X_train"]
+        y_train = cache["y_train"]
+        batch_number = cache["batch_number"]
+        total_batches = cache["total_batches"]
+        validation_tuple = cache["validation_tuple"]
+        model_instance.scalerY = cache["scalerY"]
+        model_instance.scalersX = cache["scalersX"]
+
+        if mode == "train":
+            #TRAIN and SAVE/UPLOAD - train the model and save or upload it according to cfg
+            model_instance.train_and_store(X_train, y_train, batch_number, total_batches, validation_tuple)
+            print(f"Batch {batch_number}/{total_batches} TRAINGING FINISHED")
+
+    if mode == "prepare":
+        print("Data preparation finished")
+        return
+
+    print(red("STARTING VALIDATION"))
     model_instance: ModelML = mu.load_model(model_instance.name, model_instance.version)
     if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
         predict_live(model_instance, validation_runners, validation_batch)
@@ -247,12 +302,12 @@ def train():
 
 
 def vector_evaluation(model_instance, X_test, y_test):
-    print("STARTING EVALUATION - VECTOR BASED")
+    print(bold("STARTING EVALUATION - VECTOR BASED"))
     result = model_instance.model.evaluate(X_test, y_test)
     print(result)
 
 def measure_infer_speed(model_instance, X_test):
-    print("ITERATIONs - to measure INFER SPEED")
+    print(bold("ITERATIONs - to measure INFER SPEED"))
     total_time = 0
     for idx, val in enumerate(X_test[0]):
         one_sample = []
@@ -278,7 +333,7 @@ def measure_infer_speed(model_instance, X_test):
     print(f"Average time per iteration: {average_time} seconds")
 
 def predict_live(model_instance, validation_runners, validation_batch):
-    print("SCALAR PREDICTION -LIVE SIMULATION")
+    print(red("SCALAR PREDICTION -LIVE SIMULATION"))
     #EVALUATE SIM LIVE - PREDICT SCALAR - based on last X items
     sources = model_instance.load_runners_as_list(runner_id_list=validation_runners, batch_id=validation_batch)
     #zmergujeme vsechny data dohromady 
@@ -291,7 +346,7 @@ def predict_live(model_instance, validation_runners, validation_batch):
     # Create an instance of the dynamically created class
     state = State()   
     value = model_instance.predict(state)
-    print("prediction for LIVE SIM:", value)
+    print(red("prediction for LIVE SIM:", value))
     print("Shape of predictions", value.shape)
     if value.shape == (1,1):
         print("Value:",float(value))
@@ -299,7 +354,35 @@ def predict_live(model_instance, validation_runners, validation_batch):
         print("predicted max", np.argmax(value, axis=1))
 
     end_time = time.time()  # End timing
-    print(f"Time taken for this iteration: {end_time - start_time} seconds")
+    print(bold(f"Time taken for this iteration: {end_time - start_time} seconds"))
 
 if __name__ == "__main__":
-    main()
+    """
+    Prepare from inputs and train   
+    - run.py train
+    - run.py train --toml custom.toml 
+
+    Prepare from inputs, store to cache and train
+    - run.py train --to_file input_data.joblib
+
+    Load from cache and train
+    - run.py train --from_file input_data.joblib
+
+    Prepare from inputs and store to cache
+    run.py prepare --to_file input_data.joblib
+    """
+    parser = argparse.ArgumentParser(description="Process different modes of operation.")
+
+    # Define a positional argument for mode
+    parser.add_argument("mode", choices=['train', 'prepare'], help="Mode of operation: train or prepare")
+
+    # Define an optional argument for the cache file
+    parser.add_argument("--to_file", help="Cache file to store prepared data.", default=None)
+
+    parser.add_argument("--from_file", help="CAche file to load data from", default=None)
+
+    parser.add_argument("--toml", help="TOML configuration file", default=None)
+
+    args = parser.parse_args()
+
+    main(args.mode, args.to_file, args.from_file, args.toml)

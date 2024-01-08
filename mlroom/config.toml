@@ -7,9 +7,16 @@
     upload = true #nyni se uploaduje po kazdem batchi
     save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
+
+# [cache] #for remote SCP of prepared data (save/load)
+#     remote_host = '5.161.179.223'
+#     username = 'david'
+#     private_key_path = '~/.ssh/id_ed25519'
+#     remote_path = '/home/david/'  # Remote path where the file will be located
+
 [train]
-    #runners = ["8fefeaa9-0c85-448a-83af-0bf0657d6012"]
-    batch = "c1cf7114"
+    runners = ["878af6c2-f19c-45cf-a220-a241e9cce04e"]
+    #batch = "c1cf7114"
     remove_cross_sequences = true #nyni nefunguje, je true
     runners_per_batch = 9999 #how many runners per batch
 
@@ -22,7 +29,7 @@
 
 [fit] #params that go to Model.fit
     batch_size = 128
-    epochs = 5
+    epochs = 1
     validation_split = 0 #validace po kazde z epoch (ubira z testovacich dat
     verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
     

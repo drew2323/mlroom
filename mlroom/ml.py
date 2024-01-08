@@ -8,6 +8,7 @@ from mlroom.utils.enums import PredOutput, Source, TargetTRFM, ScalingMode
 from mlroom.config import DATA_DIR, SOURCES_GRANULARITY
 import joblib
 from mlroom.utils import mlutils as mu
+from mlroom.utils.mlutils import red, bold
 #import utils.mlutils as mu
 #from .utils import slice_dict_lists
 import numpy as np
@@ -169,8 +170,8 @@ class ModelML:
 
             model_params = self.architecture.get("params", {})
 
-            print("MODEL: ", model_name)
-            print("MODEL PARAMS:", model_params)
+            print(red(f"MODEL: {model_name}"))
+            print("MODEL PARAMS:", red(model_params))
 
             arch_function = eval("arch."+model_name+"."+model_name)
             print("FUNCTION TO CALL",arch_function)
@@ -190,12 +191,13 @@ class ModelML:
         validation_runners = self.cfg.get("validation",{}).get("runners", None)
         validation_batch = self.cfg.get("validation",{}).get("batch", None)
         if (validation_runners is not None and len(validation_runners) > 0) or validation_batch is not None:
-            print(f"Loading validations {validation_runners=} {validation_batch=}")
+            print(red(f"Loading validations {validation_runners=} {validation_batch=}"))
             source_data = self.load_data(runners_ids=validation_runners, batch_id=validation_batch)
             concatenated, day_indexes = mu.concatenate_loaded_data(source_data)
             #for validation data - just transform, no fit
             X_test, y_test = self.scale_and_sequence(concatenated, day_indexes, scaling=ScalingMode.ONLY_TRANSFORM)
             X_test = list(X_test.values())
+            print(red("VALIDATION DATA SEQUENCED"))
             return (X_test, y_test)
         else:
             print("No validation runners or batch provided")
@@ -218,9 +220,9 @@ class ModelML:
                     self.metadata["history"]["saved_best"] = {}
                 self.metadata["history"]["saved_best"][key] = {"epoch": best_epoch, metric: best_value}
                 self.model = load_model(filepath)
-                print(f"CHECKPOINTED MODEL USED [{metric}]: {best_value} epoch: {best_epoch}")
+                print(red(f"CHECKPOINTED MODEL USED [{metric}]: {best_value} epoch: {best_epoch}"))
             except Exception as e:
-                print("ERROR in CHECKPOINT"+ str(e)+ format_exc())
+                print(red("ERROR in CHECKPOINT"+ str(e)+ format_exc()))
 
     def populate_fit_params(self, validation_tuple = None, y_train = None):
        #POPULATE FIT PARAMS (key callback is processed)
@@ -247,14 +249,14 @@ class ModelML:
                 # Convert string keys to integer keys (bc of TOML)
                 class_weight_int_keys = {int(key): value for key, value in class_weight.items()}
                 fit_params["class_weight"] = class_weight_int_keys
-                print("Class_weight set to",class_weight_int_keys)
+                print(bold(f"Class_weight set to {class_weight_int_keys}"))
             #jde o string ("balanced") vypocitavama distribuci automaticky
             elif isinstance(class_weight, str):
                 y_train_1d = y_train.ravel() 
                 #Calculate class weights distribution calculation
                 class_weights = compute_class_weight(class_weight, classes=np.unique(y_train_1d), y=y_train_1d)
                 class_weight_dict = dict(enumerate(class_weights))
-                print("Calculated class_weight",class_weight_dict)
+                print(bold(f"Calculated class_weight {class_weight_dict}"))
                 fit_params["class_weight"] = class_weight_dict
             else:
                 print("not valid setting in class_weight")
@@ -270,7 +272,7 @@ class ModelML:
         if batch_number == 1:
             self.initialize_model(X_train)
         else:
-            print("RETRAINING THE MODEL")
+            print(bold("RETRAINING THE MODEL"))
 
         res_object=self.model.fit(X_train,y_train, **fit_params)
         key = f"batch_{batch_number}_{total_batches}"
@@ -294,7 +296,7 @@ class ModelML:
                 print("ERROR UPLOADING",res, val)
                 return
             else:
-                print("uploaded", res)
+                print("Model UPLOADED", res)
 
     #PUVDNO SAVE bez podpory custom layers
     def save_legacy(self):
@@ -321,7 +323,7 @@ class ModelML:
 
     def upload(self):
         filename = mu.get_full_filename(self.name,self.version)
-        return exts.upload_file(filename)
+        return exts.upload_file(filename, self.cfg['upload_server'])
 
     #create X data with features
     #Pro každý typ vstupu vytvorime samostatne pole vstupe dle danych indikatoru
@@ -458,13 +460,13 @@ class ModelML:
             print("loading runners for ",str(runner_id_list))
         elif batch_id is not None:
             print("Loading runners for train_batch_id:", batch_id)
-            res, runner_ids = exts.get_archived_runners_list_by_batch_id(batch_id)
+            res, runner_ids = exts.get_archived_runners_list_by_batch_id(batch_id, self.cfg["download_server"])
             if res < 0:
                 print("error", runner_ids)
                 return None, None
         elif self.train_batch_id is not None:
             print("Loading runners for TRAINING BATCH self.train_batch_id:", self.train_batch_id)
-            res, runner_ids = exts.get_archived_runners_list_by_batch_id(self.train_batch_id)
+            res, runner_ids = exts.get_archived_runners_list_by_batch_id(self.train_batch_id, self.cfg["download_server"])
             if res < 0:
                 print("error", runner_ids)
                 return None, None
@@ -478,7 +480,7 @@ class ModelML:
         for runner_id in tqdm(runner_ids):
             daily_dict = defaultdict(list)
             #returns dictionary with keys of distinct_sources
-            sources = mu.load_runner(runner_id, self.distinct_sources, False)
+            sources = mu.load_runner(runner_id, self.distinct_sources, self.cfg["download_server"], False)
             print(f"runner:{runner_id}")
 
             if len(self.distinct_sources) != len(sources):
@@ -737,7 +739,7 @@ class ModelML:
     #muze byt volano z train nebo evaluate, podle toho but i fitujeme nebo jen transformujeme
     #muze byt take volano v ramci batchove pripravy, kdy pouzivame fit partial
     def scale_and_sequence(self, concat_data, day_indexes, scaling: ScalingMode = ScalingMode.FIT_AND_TRANSFORM):
-
+        print(bold("Sequencing started"))
         source_dict = self.prep_data(concat_data, day_indexes)
 
         """"
@@ -789,7 +791,7 @@ class ModelML:
         #zde iterujeme nad inputy (highres, lowres...)
         for key, data in source_dict.items():
             sequence_length = data['sequence_length']
-            print("INPUT:", key)
+            print(red(f"INPUT: {key}"))
             #vytahneme vsechny featury a jejich data
             features = [np.array(data[feature]) for feature in data if feature not in excluded_keys]
             print("poradi sloupcu ", str([feature for feature in data if feature not in excluded_keys]))
@@ -809,7 +811,7 @@ class ModelML:
 
             #scalerX je nakonfiguruvan per vstup
             if self.scalersX.get(key,None) is not None:
-                print(f"Scaling using: {scaling}")
+                print(bold(f"Scaling using: {scaling}"))
                 match scaling:
                     case ScalingMode.FIT_AND_TRANSFORM:
                         features = self.scalersX[key].fit_transform(features)
@@ -821,12 +823,9 @@ class ModelML:
                     case _:
                         raise Exception("unknow scaling method for scalerX")
 
-                print("scaler vidi")
-                print("pocet featur:", self.scalersX[key].n_features_in_)
-                #print(scaler.feature_names_in_)
-                print("pocet samplu:", self.scalersX[key].n_samples_seen_)
+                print(bold(f"scalered features:{self.scalersX[key].n_features_in_} samples:{self.scalersX[key].n_samples_seen_}"))
             else:
-                print(f"NO SCALER defined for {key}")
+                print(bold(f"NO SCALER defined for {key}"))
 
             # Transpose Back
             # Converting to a list of three items, each being a numpy array
@@ -874,6 +873,7 @@ class ModelML:
             daily_sequences_array = np.concatenate(daily_sequences, axis=0) 
             X_train[key] = daily_sequences_array
 
+        print(red("Sequencing target"))
         ##TADY jeste target - muzeme zpracovat najednou, jen pripadne resamplovat
         # Target sequence generation
         #
@@ -905,7 +905,7 @@ class ModelML:
         y_train = np.array(y_train)
         y_train = y_train.reshape(-1,1) #reshape to (300,1) from (300,)
         
-        print(f"Scaling y_train, mode: {scaling}")
+        print(bold(f"mode: {scaling}"))
         if self.scalerY is not None:
             match scaling:
                 case ScalingMode.FIT_AND_TRANSFORM:
@@ -919,11 +919,7 @@ class ModelML:
                     raise Exception("unknow scaling method")
 
             scaler = self.scalerY
-            print("scaler vidi")
-            print("pocet featur:", scaler.n_features_in_)
-            #print(scaler.feature_names_in_)
-            print("pocet samplu:", scaler.n_samples_seen_)
-
+            print(bold(f"scaled features: {scaler.n_features_in_} samples: {scaler.n_samples_seen_}"))
         return X_train, y_train
 
     @staticmethod
@@ -1064,16 +1060,15 @@ class ModelML:
             # for key in distinct_sources:
             #     sources_dict[key] = mu.merge_dicts(src[key])
 
-        print("Data LOADED.")
-        print("Number of days",len(sources))
+        print(red(f"LOADED {len(sources)} days"))
         print("Distinct sources:", self.distinct_sources)
         for idx, value in enumerate(sources):
-            print("Day:", idx+1)
+            print(bold(f"Day: {idx+1}"))
             for key in self.distinct_sources: 
                 klice = sources[idx][key].keys() 
                 first_key_idx = list(klice)[0]
                 first_key_len = len(sources[idx][key][first_key_idx])     
-                print(f"{key} contains: {len(sources[idx][key])} with length: {first_key_len}")
+                print(f"{key}: {len(sources[idx][key])} length: {first_key_len}")
 
 
         #pritomnost targetu validovat pozdeji

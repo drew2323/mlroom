@@ -8,13 +8,13 @@
     save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
 [train]
-    runners = ["d9825d0b-a9ea-4d40-8563-a64d7e360b31"]
+    runners = ["3dc6e3ac-79e0-44c1-baaf-ef2858afc564","7310775f-2f18-46e7-97a4-77734495abdc","d93439ae-4917-4d6a-9f96-4f25b93e9024"]
     #batch = "c1cf7114"
     remove_cross_sequences = true #nyni nefunguje, je true
     runners_per_batch = 9999 #how many runners per batch
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
-    runners = ["d9825d0b-a9ea-4d40-8563-a64d7e360b31"] #runners or batch as sources
+    runners = ["a20a4022-dfa3-43ae-bde1-632ad63cc139"] #runners or batch as sources
     #batch = "53e04a2a" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
     #test_size = 0 #DECOMM - zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
@@ -63,7 +63,7 @@
 
 [model]
      #vsechny ceny logreturn test
-    name = "TransTick" #name that would be used to predict
+    name = "TransTickVolume" #name that would be used to predict
     version = 0.1
     note = "Test Tick Indicators and tick target"
 
