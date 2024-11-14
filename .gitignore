@@ -24,6 +24,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.csv
 MANIFEST
 
 # PyInstaller
@@ -163,3 +164,4 @@ cython_debug/
 training_data.joblib
 *.cache
 *.joblib
+*.csv

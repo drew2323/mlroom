@@ -346,11 +346,12 @@ def predict_live(model_instance, validation_runners, validation_batch):
     # Create an instance of the dynamically created class
     state = State()   
     value = model_instance.predict(state)
-    print(red("prediction for LIVE SIM:", value))
+    print(red(f"prediction for LIVE SIM: {value}"))
     print("Shape of predictions", value.shape)
     if value.shape == (1,1):
         print("Value:",float(value))
     else:
+        print("Val:", value)
         print("predicted max", np.argmax(value, axis=1))
 
     end_time = time.time()  # End timing

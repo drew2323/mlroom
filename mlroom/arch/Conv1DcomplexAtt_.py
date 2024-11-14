@@ -44,11 +44,11 @@ def Conv1DcomplexAtt_(input_shape, **params):
     model.add(Input(shape=input_shape[0]))
     
     # Convolutional Layers
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', padding='same'))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=128, kernel_size=3, activation='relu', padding='same'))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=256, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=256, kernel_size=3, activation='relu', padding='same'))
     model.add(MaxPooling1D(pool_size=2))
     # Self-Attention Layer
     model.add(SelfAttention())

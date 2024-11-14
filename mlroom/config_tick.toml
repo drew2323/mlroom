@@ -8,41 +8,41 @@
     save_best = true #stores/uploads best but not last, not the final model but checkpointed (model with best val_loss according to checkpoint)
 
 [train]
-    #runners = ["3dc6e3ac-79e0-44c1-baaf-ef2858afc564","7310775f-2f18-46e7-97a4-77734495abdc","d93439ae-4917-4d6a-9f96-4f25b93e9024"]
-    batch = "bc7169c2"
+    runners = ["2c1c3aef-3460-4ab1-8b37-87e1bcfa28eb","327d3448-7bea-466e-8517-7f90e65ba95e"]
+    #batch = "bc7169c2"
     remove_cross_sequences = true #nyni nefunguje, je true
     runners_per_batch = 9999 #how many runners per batch
 
 [validation] #toto je externi(nasledna) validace (SCALAR(rt test) a VECTOR)
-    #runners = ["a20a4022-dfa3-43ae-bde1-632ad63cc139"] #runners or batch as sources
-    batch = "442fee3b" #nad konkretnim batchem
+    runners = ["e349d9dd-2b6d-4c81-a022-4a1233290a81","915bcdfa-ea54-494a-bd3d-084fc2bdf265"] #runners or batch as sources
+    #batch = "442fee3b" #nad konkretnim batchem
     validate_during_fit = true #posila externi validacni data (runnery/batche) do fit jako validaiton_data pro zobrazeni loss, zatim neimplementovano, pokud neni tak se bere z fit.validation_split
     #test_size = 0 #DECOMM - zda se maji splitnout X data pro externi validaci (pozor bere data na trenink)
     #send_val_data_to_fit
 
 [fit] #params that go to Model.fit
     batch_size = 128
-    epochs = 5
+    epochs = 15
     validation_split = 0 #validace po kazde z epoch (ubira z testovacich dat
     verbose = 'auto' # 0 = silent, 1 = progress bar, 2 = one line per epoch
     
     #class_weight = "balanced" #can be dict(goes directly to fit) or string - then it calculates balanced weights
     #{0: 2.2578978447003246, 1: 0.434418314019541, 2: 3.918780425313861} pripadne 0 a 2 prohozena
-    class_weight.0 = 5.5
-    class_weight.1 = 0.1
-    class_weight.2 = 5.5
-    #these params are used only for validation_data
+    # class_weight.0 = 5.5
+    # class_weight.1 = 0.1
+    # class_weight.2 = 5.5
+    #OPT these params are used only for validation_data
     #validation_steps = 
     #validation_batch_size =
     #validation_freq =
 
 # ModelCheckpoint to save the model with the lowest validation loss
-# [fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
-#     filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
-#     monitor='val_loss'
-#     mode='min' #max
-#     save_best_only=true #save best or save each epoch
-#     verbose=1
+[fit.callbacks.ModelCheckpoint] ## Load the best_model = load_model('best_model.h5')
+    filepath = 'checkpoint.model.keras' #"{epoch:02d}-{val_loss:.2f}.keras"
+    monitor='val_loss'
+    mode='min' #max
+    save_best_only=true #save best or save each epoch
+    verbose=1
 
 # [fit.callbacks.EarlyStopping]
 #     monitor='val_loss' #'mean_squared_error' #val_loss
@@ -63,37 +63,36 @@
 
 [model]
      #vsechny ceny logreturn test
-    name = "TransTickVolume" #name that would be used to predict
+    name = "TestRegress1InputConv" #name that would be used to predict
     version = 0.1
-    note = "Test Tick Indicators and tick target"
+    note = "target close no log, 1,1 vsrtva, scaled, Linregress next bar, volbars 20k = eq 1min bars"
 
 #this is the target that will be used for label
 #we support target resampling, if used on other than highest resolution
 [model.target] #target used for labeling, we support target resampling, if used on other than highest resolution
-    indicators = "targetema"
+    indicators = "target_next_close_log"
     target_reference = "tick_price"
-    #scaler = "MinMaxScaler" #pokud zakomentovano, nescalujeme
+    scaler = "StandardScaler" #pokud zakomentovano, nescalujeme
 [model.input.highres]
-    cbar_indicators = ["crsi14","daytimetick","slopetick5","tick_count1","tick_price_log_return","tick_ROC","tick_trades","tick_volume_log_return","volume_tick_divergence","tick_vol_window"]
+    cbar_indicators = ["crsi14","daytimetick","slopetick5","tick_count1","tick_price_log_return","tick_ROC","tick_trades","tick_time_delta","tick_volume_log_return","volume_tick_divergence"]
     #cbar_indicators = ["tick_volume","tick_trades", "daytimetick", "tick_price_log_return", "tick_price"]
-    sequence_length = 40
+    sequence_length = 30
     scaler = "StandardScaler"
 [model.input.lowres]
     bars = ["trades","vwap","close","open","high","low"]
-    indicators = ["daytimebar", "divema", "slope5", "voldiv", "rsi14MA", "emaSlow","vwap_log_return","close_log_return","open_log_return","high_log_return","low_log_return"]
+    indicators = ["upper_shadow_ratio","lower_shadow_ratio","body_size_ratio","body_position_ratio","vwap_cum","div_vwap_cum","daytimebar", "slope5", "rsi14MA", "emaSlow","vwap_log_return","close_log_return","open_log_return","high_log_return","low_log_return", "weekday"]
     sequence_length = 100
     scaler = "StandardScaler"
 # [model.input.daily]
-#     dailyBars = ["rsi", "volume_sma_divergence", "open", "close"]
+#     dailyBars = ["upper_shadow_ratio","lower_shadow_ratio","body_size_ratio","body_position_ratio","rsi", "volume_sma_divergence", "volume_sma", "vwap_cum", "vwap_cum", "open_log_return", "close_log_return", "high_log_return", "low_log_return"]
 #     sequence_length = 25
 #     scaler = "StandardScaler"
 [model.architecture]
-    name = "Transformer2Inputs_" #"Conv1D2Inputs_" #"Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
+    name = "Conv1Dcomplex_" #"Conv1D2Inputs_" #"Conv1DLSTM2InputsAtt_"  #Conv1D3Inputs_ LSTM3Inputs_ #Conv1D_ "TCN_" "Conv1DcomplexAtt_"  name of file/function with architecture
 [model.architecture.params] #params that are passed into model function (needed to compile)
     learning_rate = 0.001 #0.00005
-    trans_layers = [1,1] #number of transformer layers for each input
+    trans_layers = [2,1] #number of transformer layers for each input
     l2_reg = 0.001 # Added L2 regularization parameter
-
 
 
 #TODO batches bude treba predelat

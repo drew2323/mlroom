@@ -12,16 +12,17 @@ from keras.models import Sequential, Model
 from keras.layers import MultiHeadAttention, GlobalAveragePooling1D, Concatenate, LayerNormalization, Dense, Conv1D, Flatten, MaxPooling1D, Dropout, LSTM, BatchNormalization, AveragePooling1D, Input
 from keras.optimizers import Adam
 from keras_nlp.layers import SinePositionEncoding, TransformerEncoder
+from keras.regularizers import l2
 
 # Define Transformer block - bud takto explciitne a nebo TransformerEncoder
-def transformer_block(inputs, num_heads, ff_dim, rate=0.1):
-    attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=ff_dim)(inputs, inputs)
-    attention_output = Dropout(rate)(attention_output)
-    out1 = LayerNormalization(epsilon=1e-6)(inputs + attention_output)
-    ff_output = Dense(ff_dim, activation="relu")(out1)
-    ff_output = Dense(inputs.shape[-1])(ff_output)
-    ff_output = Dropout(rate)(ff_output)
-    return LayerNormalization(epsilon=1e-6)(out1 + ff_output)
+# def transformer_block(inputs, num_heads, ff_dim, rate=0.1):
+#     attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=ff_dim)(inputs, inputs)
+#     attention_output = Dropout(rate)(attention_output)
+#     out1 = LayerNormalization(epsilon=1e-6)(inputs + attention_output)
+#     ff_output = Dense(ff_dim, activation="relu")(out1)
+#     ff_output = Dense(inputs.shape[-1])(ff_output)
+#     ff_output = Dropout(rate)(ff_output)
+#     return LayerNormalization(epsilon=1e-6)(out1 + ff_output)
 
 def Transformer1Input_(input_shape, **params):
     """
@@ -41,10 +42,16 @@ def Transformer1Input_(input_shape, **params):
     custom_layers = {}
 
     learning_rate = params.get("learning_rate", 0.001)
+    #transformer layers for each input
+    trans_layers = params.get("trans_layers", [1,1])
+    l2_reg = params.get("l2_reg", 0.001)  # Added L2 regularization parameter
 
-    # Define TransformerEncoder for each input
-    # transformer_encoder_1 = Transformer3Encoder(intermediate_dim=128, num_heads=4)  # For input with 4 features
-    # transformer_encoder_2 = TransformerEncoder(intermediate_dim=128, num_heads=12)  # For input with 12 features
+
+    # # Transformer block for each time series
+    # transformer_ts1 = transformer_block(pos_encoding_1, num_heads=2, ff_dim=64)
+    # transformer_ts2 = transformer_block(pos_encoding_2, num_heads=2, ff_dim=64)
+
+    #TODO maybe add Masking ??
 
     # Inputs for each time series with different sequence lengths
     input_ts1 = Input(shape=input_shape[0])  # Adjust sequence_length_1 as needed
@@ -54,40 +61,40 @@ def Transformer1Input_(input_shape, **params):
     pos_encoding_1 = SinePositionEncoding()(input_ts1)
     #pos_encoding_2 = SinePositionEncoding()(input_ts2)
 
-    #add encoding to the input
-    comb_input_ts1 = pos_encoding_1 + input_ts1
+    # Add encodings to inputs
+    x1 = pos_encoding_1 + input_ts1
+    #x2 = pos_encoding_2 + input_ts2
 
-    # Transformer block for each time series
-    transformer_ts1 = transformer_block(comb_input_ts1, num_heads=4, ff_dim=2048)
-    #transformer_ts2 = transformer_block(pos_encoding_2, num_heads=12, ff_dim=2048)
+    # Apply required numbers of Transformer Encoders to each input
+    for _ in range(trans_layers[0]):
+        x1 = TransformerEncoder(intermediate_dim=64, num_heads=5, dropout=0.2)(x1)
+        #x1 = BatchNormalization()(x1)
+        #x1 = Dropout(0.5)(x1)  # Adjust the dropout rate as needed
 
-    # Apply Transformer Encoder to each input
-    # transformed_ts1 = transformer_encoder_1(pos_encoding_1)
-    # transformed_ts2 = transformer_encoder_2(pos_encoding_2)
+    # for _ in range(trans_layers[1]):
+    #     x2 = TransformerEncoder(intermediate_dim=128, num_heads=4, dropout=0.2)(x2)
+    #     #x2 = BatchNormalization()(x2)
+    #     #x2 = Dropout(0.5)(x2) 
 
     # After the TransformerEncoder layers - to allow concatenation
-    # pooled_ts1 = GlobalAveragePooling1D()(transformer_ts1)
-    # pooled_ts2 = GlobalAveragePooling1D()(transformer_ts2)
+    x1 = GlobalAveragePooling1D()(x1)
+    #x2 = GlobalAveragePooling1D()(x2)
 
     # Then concatenate
-    # combined = Concatenate()([pooled_ts1, pooled_ts2])
-    #combined = Concatenate()([transformer_ts1, transformer_ts2])
-
-    pooled = GlobalAveragePooling1D()(transformer_ts1)
+    #combined = Concatenate()([x1, x2])
 
     # Additional layers
-    x = Dense(64, activation='relu')(pooled)
+    x = Dense(64, activation='relu')(x1)
     #output = Dense(3, activation='softmax')(x)  # For trend classification: downtrend, no trend, uptrend
-    output = Dense(1, activation='tanh')(x)  # Single output neuron with tanh activation
+    output = Dense(1, activation='linear')(x)  # Single output neuron with tanh activation
 
     # Build the model
-    model = Model(inputs=[input_ts1], outputs=output) #, input_ts2
+    model = Model(inputs=[input_ts1], outputs=output)
 
     # Compile the model
     optimizer = Adam(learning_rate=learning_rate)
     #model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    # optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
 
     return model, custom_layers

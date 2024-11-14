@@ -23,10 +23,9 @@ def Conv1D_(input_shape, **params):
 
     # Explicitly define the Input layer
     model.add(Input(shape=input_shape[0]))
-
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', padding='same'))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=128, kernel_size=3, activation='relu', padding='same'))
     model.add(MaxPooling1D(pool_size=2))
     model.add(Flatten())
     # Fully connected layers

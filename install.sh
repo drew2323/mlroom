@@ -16,7 +16,9 @@ pip install keras
 cd src/mlroom/mlroom
 
 #RUN ON LOCAL MAC (or other which has priv key) - transfer priv key 
-scp ~/.ssh/id_ed25519 user@5.161.179.223:~/.ssh/
+ssh -p 8935 user@206.168.80.4
+scp -P 8935 ~/.ssh/id_ed25519 user@206.168.80.4:~/.ssh/
+nano ~/.ssh/known_hosts
 
 #PREP DATA TRANSFER
 

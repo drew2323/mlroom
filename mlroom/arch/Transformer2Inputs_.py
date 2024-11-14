@@ -85,16 +85,16 @@ def Transformer2Inputs_(input_shape, **params):
 
     # Additional layers
     x = Dense(64, activation='relu')(combined)
-    output = Dense(3, activation='softmax')(x)  # For trend classification: downtrend, no trend, uptrend
-    #output = Dense(1, activation='tanh')(x)  # Single output neuron with tanh activation
+    #output = Dense(3, activation='softmax')(x)  # For trend classification: downtrend, no trend, uptrend
+    output = Dense(1, activation='linear')(x)  # Single output neuron with tanh activation
 
     # Build the model
     model = Model(inputs=[input_ts1, input_ts2], outputs=output)
 
     # Compile the model
     optimizer = Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    #model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    #model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
+    model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
 
     return model, custom_layers

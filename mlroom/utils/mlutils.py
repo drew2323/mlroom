@@ -39,24 +39,25 @@ def load_model_legacy(name = None, version = "1", file = None, directory = MODEL
 
 
 #CUSTOM LAYER SUPPORTED SAVE and LOAD- https://chat.openai.com/c/d53c23d0-5029-427d-887f-6de2675c1b1f
-def load_model(name = None, version = "1", file = None, directory = MODEL_DIR, cfg_only = False):
-  if file is None:
-     filename = get_full_filename(name, version, directory)
-  else:
-     filename = directory / file
+#LOADING other model types than keras - https://gemini.google.com/app/5bfbb6cd8c6f39c5
+def load_model(name=None, version="1", file=None, directory=MODEL_DIR, cfg_only=False):
+    if file is None:
+        filename = get_full_filename(name, version, directory)
+    else:
+        filename = directory / file
 
-  # Load the entire instance with joblib
-  loaded_instance = joblib.load(filename)
+    # Load the entire instance with joblib
+    loaded_instance = joblib.load(filename)
 
-  #pro cteni metadat, nepotrebujeme cely model jen cfg
-  if cfg_only is False:
-    # Deserialize the Keras model
-    model_json = loaded_instance.model['model_json']
-    model_weights = loaded_instance.model['model_weights']
-    loaded_instance.model = model_from_json(model_json, custom_objects=loaded_instance.custom_layers)
-    loaded_instance.model.set_weights(model_weights)
+    # pro cteni metadat, nepotrebujeme cely model jen cfg
+    if cfg_only is False:
+        if isinstance(loaded_instance.model, dict):  # Check if we deserialized a Keras model 
+            model_json = loaded_instance.model['model_json']
+            model_weights = loaded_instance.model['model_weights']
+            loaded_instance.model = model_from_json(model_json, custom_objects=loaded_instance.custom_layers)
+            loaded_instance.model.set_weights(model_weights)
 
-  return loaded_instance
+    return loaded_instance
 
 def slice_dict_lists(d, last_item, to_tmstp = False):
   """Slices every list in the dictionary to the last last_item items.

@@ -18,7 +18,7 @@ from mlroom.utils import ext_services as exts
 import mlroom.arch as arch
 import requests
 import keras.callbacks as cb
-from keras.models import model_from_json, load_model
+from keras.models import model_from_json, load_model, Model
 import inspect
 import pickle
 import pandas as pd
@@ -307,19 +307,22 @@ class ModelML:
     #CUSTOM LAYER SUPPORTED SAVE and LOAD- https://chat.openai.com/c/d53c23d0-5029-427d-887f-6de2675c1b1f
     def save(self):
         filename = mu.get_full_filename(self.name,self.version)
-        # Save the Keras model separately
-        model_json = self.model.to_json()
-        model_weights = self.model.get_weights()
 
-        # Replace the model attribute with its serialized form
-        self.model = {'model_json': model_json, 'model_weights': model_weights}
+        # Branch based on model type
+        if isinstance(self.model, Model):  # Check if it's a Keras model
+            # Save the Keras model separately
+            model_json = self.model.to_json()
+            model_weights = self.model.get_weights()
+            # Replace the model attribute with its serialized form
+            self.model = {'model_json': model_json, 'model_weights': model_weights}
 
-        # Use joblib to serialize the entire instance
+        # Use joblib to serialize the entire instance (other types that Keras)
         joblib.dump(self, filename)
 
-        # Restore the model attribute to its original state
-        self.model = model_from_json(model_json, custom_objects=self.custom_layers)
-        self.model.set_weights(model_weights)
+        # Restore the model attribute to its original state (Keras only)
+        if isinstance(self.model, dict): 
+            self.model = model_from_json(model_json, custom_objects=self.custom_layers)
+            self.model.set_weights(model_weights)
 
     def upload(self):
         filename = mu.get_full_filename(self.name,self.version)
@@ -1091,6 +1094,8 @@ class ModelML:
             for key, feature_list in self.features_required.items():
                 if ModelML.list1_subset_list2(sources_dict[idx][key].keys(),list(feature_list)) is False:
                     print(f"Missing features in '{key}' required {feature_list} but in day {idx} are these: {sources_dict[idx][key].keys()}")
+                    print(f"REQ:{feature_list}")
+                    print(f"CUR:{sources_dict[idx][key].keys()}")
                     raise Exception(f"Missing features in {key} required {feature_list} but in day {idx} found only these: {sources_dict[idx][key].keys()}")
 
     def validate_available_features_old(self, bars, indicators):

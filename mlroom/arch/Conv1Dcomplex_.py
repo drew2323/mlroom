@@ -40,7 +40,7 @@ def Conv1Dcomplex_(input_shape, **params):
     model.add(Dropout(0.4))  # Adjusted dropout rate
 
     # Output Layer
-    model.add(Dense(1, activation='tanh'))  # Retain tanh for output in the range of -1 to 1
+    model.add(Dense(1, activation='linear'))  # Retain tanh for output in the range of -1 to 1
 
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse', metrics=['mean_squared_error'])
